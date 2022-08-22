@@ -1,12 +1,13 @@
 package util;
 
-import org.rascalmpl.values.IRascalValueFactory;
-import org.rascalmpl.values.RascalValueFactory;
-
-import io.usethesource.vallang.IValue;
+import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.IString;
+import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
+import org.iguana.grammar.Grammar;
+import org.rascalmpl.values.IRascalValueFactory;
+import org.rascalmpl.values.RascalValueFactory;
 
 public class ParserGenerator {
     private final IRascalValueFactory vf;
@@ -19,18 +20,17 @@ public class ParserGenerator {
         this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(tf.stringType()), tf.tupleEmpty());
     }
 
-    public IValue parser(IValue grammar) {
-        // generate the parser here
-        Object parser = null;
+    public IValue createParser(IValue grammar) {
+        RascalGrammarToIguanaGrammarConverter converter = new RascalGrammarToIguanaGrammarConverter();
+        Grammar iguanaGrammar = converter.convert((IConstructor) grammar);
+        System.out.println(iguanaGrammar);
 
         return vf.function(ftype, (args, kwArgs) -> {
             // input is a string for now 
             IString input = (IString) args[0];
 
             // use the parser here to turn the string into a tree
-            System.err.println(parser);
-
-            return null/*parse tree*/;
+            return vf.character('c')/*parse tree*/;
         });
     }
 

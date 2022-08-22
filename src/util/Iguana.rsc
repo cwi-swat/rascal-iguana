@@ -3,15 +3,17 @@ module util::Iguana
 extend ParseTree;
 import IO;
 
-syntax A = "a";
+syntax A = "a" | B;
+
+syntax B = "b";
 
 alias Parser[&T] = &T (str input, loc origin);
 
 @javaClass{util.ParserGenerator}
-java Parser[&T] parser(type[&T] grammar); 
+java Parser[&T] createParser(type[&T] grammar);
 
 void main() {
-    Parser[A] p = parser(#A);
+    Parser[A] p = createParser(#A);
 
     try {
      println(p("a"));

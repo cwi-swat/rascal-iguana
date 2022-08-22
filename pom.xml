@@ -50,10 +50,15 @@
         </pluginRepositories>
 
 	<dependencies>
-                <dependency>
-                    <groupId>org.rascalmpl</groupId>
-                    <artifactId>rascal</artifactId>
-                    <version>0.24.4</version>
-                </dependency>
-	</dependencies>
+        <dependency>
+            <groupId>org.rascalmpl</groupId>
+            <artifactId>rascal</artifactId>
+            <version>0.24.4</version>
+        </dependency>
+        <dependency>
+            <groupId>iguana</groupId>
+            <artifactId>iguana</artifactId>
+            <version>0.1-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
 </project>
