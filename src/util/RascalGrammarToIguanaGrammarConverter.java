@@ -17,6 +17,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         IMap definitions = (IMap) grammar.get("definitions");
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
+        Set<String> layouts = new HashSet<>();
         while (entryIterator.hasNext()) {
             Map.Entry<IValue, IValue> next = entryIterator.next();
             IValue key = next.getKey();
@@ -24,7 +25,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             System.out.println(key + " = " + value + " " + value.getType() + " " + value.getType().getName());
 
             try {
-                Rule rule = (Rule) value.accept(new ValueVisitor());
+                Rule rule = (Rule) value.accept(new ValueVisitor(layouts));
                 grammarBuilder.addRule(rule);
             } catch (Throwable e) {
                 e.printStackTrace();
@@ -35,6 +36,12 @@ public class RascalGrammarToIguanaGrammarConverter {
     }
 
     static class ValueVisitor implements IValueVisitor<Object, Throwable> {
+
+        private final Set<String> layouts;
+
+        public ValueVisitor(Set<String> layouts) {
+            this.layouts = layouts;
+        }
 
         @Override
         public String visitString(IString o) throws Throwable {
@@ -88,6 +95,11 @@ public class RascalGrammarToIguanaGrammarConverter {
             throw new RuntimeException();
         }
 
+        private boolean isLayout(IValue value) {
+            if (!(value instanceof IConstructor)) return false;
+            return ((IConstructor) value).getName().equals("layouts");
+        }
+
         @Override
         public Object visitConstructor(IConstructor o) throws Throwable {
             List<Object> visitedChildren = new ArrayList<>();
@@ -97,6 +109,10 @@ public class RascalGrammarToIguanaGrammarConverter {
             switch (o.getName()) {
                 case "choice": {
                     Nonterminal head = (Nonterminal) visitedChildren.get(0);
+                    if (isLayout(o.get(0))) {
+                        layouts.add(head.getName());
+                    }
+                    System.out.println(">>>>> layouts:" + layouts);
                     Rule.Builder ruleBuilder = new Rule.Builder(head);
                     Set<Object> children = (Set<Object>) visitedChildren.get(1);
                     for (Object object : children) {
@@ -142,6 +158,17 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return new Terminal.Builder(regex)
                         .setNodeType(TerminalNodeType.Regex)
                         .build();
+                }
+                case "iter-star-seps": {
+                    Symbol symbol = (Symbol) o.get(0).accept(this);
+                    List<Symbol> separators = (List<Symbol>) o.get(1).accept(this);
+                    Star.Builder starBuilder = new Star.Builder(symbol);
+                    for (Symbol separator : separators) {
+                        if (!layouts.contains(separator.getName())) {
+                            starBuilder.addSeparators(separator);
+                        }
+                    }
+                    return starBuilder.build();
                 }
                 default:
                     throw new RuntimeException("Unknown name: " + o.getName());

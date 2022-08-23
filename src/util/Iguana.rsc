@@ -3,9 +3,13 @@ module util::Iguana
 extend ParseTree;
 import IO;
 
-syntax A = "a" | B;
+syntax A = "a" | B* | {C ","}*;
 
 syntax B = "b";
+
+syntax C = "c";
+
+layout L = " ";
 
 alias Parser[&T] = &T (str input, loc origin);
 
