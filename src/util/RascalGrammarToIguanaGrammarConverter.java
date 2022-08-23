@@ -43,14 +43,12 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitReal(IReal o) throws Throwable {
-            System.out.println(">>>>>Real " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitRational(IRational o) throws Throwable {
-            System.out.println(">>>>>Relational " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
@@ -77,20 +75,17 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitSourceLocation(ISourceLocation o) throws Throwable {
-            System.out.println(">>>>>Location " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitTuple(ITuple o) throws Throwable {
-            System.out.println(">>>>>Tuple " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitNode(INode o) throws Throwable {
-            System.out.println(">>>>>Node " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
@@ -124,6 +119,10 @@ public class RascalGrammarToIguanaGrammarConverter {
                     String nonterminalName = (String) visitedChildren.get(0);
                     return new Nonterminal.Builder(nonterminalName).build();
                 }
+                case "layouts": {
+                    String nonterminalName = (String) visitedChildren.get(0);
+                    return new Nonterminal.Builder(nonterminalName).build();
+                }
                 case "priority": {
                     PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
                     List<Alternative> alternatives = (List<Alternative>) visitedChildren.get(1);
@@ -134,11 +133,8 @@ public class RascalGrammarToIguanaGrammarConverter {
                     Alternative.Builder alternativeBuilder = new Alternative.Builder();
                     return alternativeBuilder.build();
                 }
-                case "layouts": {
-                    return null;
-                }
                 case "empty": {
-                    return null;
+                    return new Nonterminal.Builder("empty").build();
                 }
                 case "lit": {
                     String value = o.get(0).accept(this).toString();
@@ -154,30 +150,27 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitInteger(IInteger o) throws Throwable {
-            System.out.println(">>>>>Integer " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitMap(IMap o) throws Throwable {
-            System.out.println(">>>>>Map " + o);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitBoolean(IBool boolValue) throws Throwable {
-            System.out.println(">>>>>Boolean " + boolValue);
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitExternal(IExternalValue externalValue) throws Throwable {
-            return null;
+            throw new RuntimeException();
         }
 
         @Override
         public Object visitDateTime(IDateTime o) throws Throwable {
-            return null;
+            throw new RuntimeException();
         }
     }
 }
