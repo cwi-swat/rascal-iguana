@@ -100,6 +100,11 @@ public class RascalGrammarToIguanaGrammarConverter {
             return ((IConstructor) value).getName().equals("layouts");
         }
 
+        private boolean isLexical(IValue value) {
+            if (!(value instanceof IConstructor)) return false;
+            return ((IConstructor) value).getName().equals("lex");
+        }
+
         @Override
         public Object visitConstructor(IConstructor o) throws Throwable {
             List<Object> visitedChildren = new ArrayList<>();
@@ -112,7 +117,6 @@ public class RascalGrammarToIguanaGrammarConverter {
                     if (isLayout(o.get(0))) {
                         layouts.add(head.getName());
                     }
-                    System.out.println(">>>>> layouts:" + layouts);
                     Rule.Builder ruleBuilder = new Rule.Builder(head);
                     Set<Object> children = (Set<Object>) visitedChildren.get(1);
                     for (Object object : children) {
@@ -123,7 +127,11 @@ public class RascalGrammarToIguanaGrammarConverter {
                             ruleBuilder.addPriorityLevel((PriorityLevel) object);
                         }
                     }
-                    return ruleBuilder.build();
+                    LayoutStrategy layoutStrategy = LayoutStrategy.INHERITED;
+                    if (isLexical(o.get(0))) {
+                        layoutStrategy = LayoutStrategy.NO_LAYOUT;
+                    }
+                    return ruleBuilder.setLayoutStrategy(layoutStrategy).build();
                 }
                 case "prod": {
                     Sequence.Builder sequenceBuilder = new Sequence.Builder();
@@ -132,6 +140,10 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return sequenceBuilder.build();
                 }
                 case "sort": {
+                    String nonterminalName = (String) visitedChildren.get(0);
+                    return new Nonterminal.Builder(nonterminalName).build();
+                }
+                case "lex": {
                     String nonterminalName = (String) visitedChildren.get(0);
                     return new Nonterminal.Builder(nonterminalName).build();
                 }
@@ -158,6 +170,17 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return new Terminal.Builder(regex)
                         .setNodeType(TerminalNodeType.Regex)
                         .build();
+                }
+                case "iter-seps": {
+                    Symbol symbol = (Symbol) o.get(0).accept(this);
+                    List<Symbol> separators = (List<Symbol>) o.get(1).accept(this);
+                    Plus.Builder plusBuilder = new Plus.Builder(symbol);
+                    for (Symbol separator : separators) {
+                        if (!layouts.contains(separator.getName())) {
+                            plusBuilder.addSeparators(separator);
+                        }
+                    }
+                    return plusBuilder.build();
                 }
                 case "iter-star-seps": {
                     Symbol symbol = (Symbol) o.get(0).accept(this);
