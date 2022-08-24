@@ -60,7 +60,6 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitList(IList o) throws Throwable {
-            System.out.println(">>>>>List " + o);
             List<Object> list = new ArrayList<>();
             for (IValue elem : o) {
                 Object res = elem.accept(this);
@@ -71,7 +70,6 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitSet(ISet o) throws Throwable {
-            System.out.println(">>>>Set " + o);
             Set<Object> set = new HashSet<>();
             for (IValue elem : o) {
                 Object res = elem.accept(this);
@@ -136,7 +134,10 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "prod": {
                     Sequence.Builder sequenceBuilder = new Sequence.Builder();
                     List<Symbol> symbols = (List<Symbol>) visitedChildren.get(1);
-                    sequenceBuilder.addSymbols(symbols);
+                    for (Symbol symbol : symbols) {
+                        if (!layouts.contains(symbol.getName()))
+                            sequenceBuilder.addSymbol(symbol);
+                    }
                     return sequenceBuilder.build();
                 }
                 case "sort": {

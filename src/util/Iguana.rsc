@@ -3,7 +3,7 @@ module util::Iguana
 extend ParseTree;
 import IO;
 
-syntax A = "a" | B* | {C ","}* | D+;
+syntax A = "a" D C | B* | {C ","}* | D+;
 
 syntax B = "b";
 
