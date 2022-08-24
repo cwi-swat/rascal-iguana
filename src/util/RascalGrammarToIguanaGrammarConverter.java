@@ -12,6 +12,11 @@ import java.util.*;
 
 public class RascalGrammarToIguanaGrammarConverter {
 
+    private boolean isLexical(IValue value) {
+        if (!(value instanceof IConstructor)) return false;
+        return ((IConstructor) value).getName().equals("lex");
+    }
+
     public Grammar convert(IConstructor grammar) {
         Grammar.Builder grammarBuilder = new Grammar.Builder();
         IMap definitions = (IMap) grammar.get("definitions");
@@ -24,9 +29,19 @@ public class RascalGrammarToIguanaGrammarConverter {
             IValue value = next.getValue();
             System.out.println(key + " = " + value + " " + value.getType() + " " + value.getType().getName());
 
+            ValueVisitor visitor = new ValueVisitor(layouts);
             try {
-                Rule rule = (Rule) value.accept(new ValueVisitor(layouts));
-                grammarBuilder.addRule(rule);
+                Nonterminal head = (Nonterminal) key.accept(visitor);
+                Rule.Builder ruleBuilder = new Rule.Builder(head);
+                List<PriorityLevel> priorityLevels = (List<PriorityLevel>) value.accept(visitor);
+                ruleBuilder.addPriorityLevels(priorityLevels);
+                LayoutStrategy layoutStrategy = LayoutStrategy.INHERITED;
+                if (isLexical(key)) {
+                    layoutStrategy = LayoutStrategy.NO_LAYOUT;
+                }
+
+                ruleBuilder.setLayoutStrategy(layoutStrategy);
+                grammarBuilder.addRule(ruleBuilder.build());
             } catch (Throwable e) {
                 e.printStackTrace();
             }
@@ -98,11 +113,6 @@ public class RascalGrammarToIguanaGrammarConverter {
             return ((IConstructor) value).getName().equals("layouts");
         }
 
-        private boolean isLexical(IValue value) {
-            if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("lex");
-        }
-
         @Override
         public Object visitConstructor(IConstructor o) throws Throwable {
             List<Object> visitedChildren = new ArrayList<>();
@@ -115,21 +125,28 @@ public class RascalGrammarToIguanaGrammarConverter {
                     if (isLayout(o.get(0))) {
                         layouts.add(head.getName());
                     }
-                    Rule.Builder ruleBuilder = new Rule.Builder(head);
                     Set<Object> children = (Set<Object>) visitedChildren.get(1);
+                    ISet alternatives = (ISet) o.get("alternatives");
+
+                    List<PriorityLevel> priorityLevels = new ArrayList<>();
                     for (Object object : children) {
-                        if (object instanceof Sequence) {
-                            ruleBuilder.addPriorityLevel(PriorityLevel.from(
-                                Collections.singletonList(new Alternative.Builder().addSequence((Sequence) object).build())));
-                        } else if (object instanceof PriorityLevel) {
-                            ruleBuilder.addPriorityLevel((PriorityLevel) object);
+                        if (object instanceof PriorityLevel) {
+                            priorityLevels.add((PriorityLevel) object);
+                        } else if (object instanceof Alternative) {
+                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                            priorityLevelBuilder.addAlternative((Alternative) object);
+                            priorityLevels.add(priorityLevelBuilder.build());
+                        } else if (object instanceof Sequence) {
+                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                            Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                            alternativeBuilder.addSequence((Sequence) object);
+                            priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                            priorityLevels.add(priorityLevelBuilder.build());
+                        } else {
+                            throw new IllegalStateException(object.getClass() + "");
                         }
                     }
-                    LayoutStrategy layoutStrategy = LayoutStrategy.INHERITED;
-                    if (isLexical(o.get(0))) {
-                        layoutStrategy = LayoutStrategy.NO_LAYOUT;
-                    }
-                    return ruleBuilder.setLayoutStrategy(layoutStrategy).build();
+                    return priorityLevels;
                 }
                 case "prod": {
                     Sequence.Builder sequenceBuilder = new Sequence.Builder();
@@ -138,7 +155,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                         if (!layouts.contains(symbol.getName()))
                             sequenceBuilder.addSymbol(symbol);
                     }
-                    return sequenceBuilder.build();
+                    return new Alternative.Builder().addSequence(sequenceBuilder.build()).build();
                 }
                 case "sort": {
                     String nonterminalName = (String) visitedChildren.get(0);
@@ -193,6 +210,17 @@ public class RascalGrammarToIguanaGrammarConverter {
                         }
                     }
                     return starBuilder.build();
+                }
+                case "associativity": {
+                    Associativity associativity = (Associativity) visitedChildren.get(1);
+                    Set<Sequence> seqs = (Set<Sequence>) visitedChildren.get(2);
+                    Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                    alternativeBuilder.addSequences(new ArrayList<>(seqs));
+                    alternativeBuilder.setAssociativity(associativity);
+                    return alternativeBuilder.build();
+                }
+                case "left": {
+                    return Associativity.LEFT;
                 }
                 default:
                     throw new RuntimeException("Unknown name: " + o.getName());
