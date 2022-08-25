@@ -9,7 +9,6 @@ import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class RascalGrammarToIguanaGrammarConverter {
 
@@ -134,7 +133,6 @@ public class RascalGrammarToIguanaGrammarConverter {
                     // Priority levels
                     if (!children.isEmpty() && children.iterator().next() instanceof List<?>) {
                         for (Object child : (List<Object>) children.iterator().next()) {
-                            System.out.println("child class:" + child.getClass());
                             priorityLevels.add((PriorityLevel) child);
                         }
                     } else {
@@ -228,7 +226,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     Plus.Builder plusBuilder = new Plus.Builder(symbol);
                     for (Symbol separator : separators) {
                         if (!layouts.contains(separator.getName())) {
-                            plusBuilder.addSeparators(separator);
+                            plusBuilder.addSeparator(separator);
                         }
                     }
                     return plusBuilder.build();
@@ -239,7 +237,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     Star.Builder starBuilder = new Star.Builder(symbol);
                     for (Symbol separator : separators) {
                         if (!layouts.contains(separator.getName())) {
-                            starBuilder.addSeparators(separator);
+                            starBuilder.addSeparator(separator);
                         }
                     }
                     return starBuilder.build();

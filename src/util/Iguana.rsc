@@ -7,14 +7,14 @@ syntax A
   = "a" D C
   | B*
   | {C ","}*
-  | D+
+  | {D "%"}+
   ;
 
 syntax E
   = E "-"
   > right E "^" E
-  > left E "*" E
-  | left E "/" E
+  > left (E "*" E
+  |       E "/" E)
   > left E "+" E
   | "a"
   ;
