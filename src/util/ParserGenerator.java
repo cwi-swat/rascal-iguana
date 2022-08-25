@@ -25,7 +25,7 @@ public class ParserGenerator {
         RascalGrammarToIguanaGrammarConverter converter = new RascalGrammarToIguanaGrammarConverter();
         Grammar iguanaGrammar = converter.convert((IConstructor) grammar);
         System.out.println(iguanaGrammar);
-        System.out.println(JsonSerializer.toJSON(iguanaGrammar));
+//        System.out.println(JsonSerializer.toJSON(iguanaGrammar));
 
         return vf.function(ftype, (args, kwArgs) -> {
             // input is a string for now 

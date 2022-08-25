@@ -11,15 +11,13 @@ syntax A
   ;
 
 syntax E
-  = left E "*" E
+  = E "-"
+  > right E "^" E
+  > left E "*" E
+  | left E "/" E
   > left E "+" E
   | "a"
   ;
-
-// syntax E
-//  = left (E "*" E | E "/" E)
-//  > left (E "+" E | E "-" E)
-//  ;
 
 syntax B = "b";
 

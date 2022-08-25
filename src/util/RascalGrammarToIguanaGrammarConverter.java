@@ -81,7 +81,6 @@ public class RascalGrammarToIguanaGrammarConverter {
                 Object res = elem.accept(this);
                 if (res != null) list.add(res);
             }
-            System.out.println(">>>>> list: " + o.size() + " " + o + " res: " + list);
             return list;
         }
 
@@ -131,40 +130,25 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
                     Set<Object> children = (Set<Object>) visitedChildren.get(1);
-                    System.out.println(">>>>>>classes: " + children.stream().map(child -> child.getClass()).collect(Collectors.toList()));
 
-                    boolean allSequences = children.stream().allMatch(c -> c instanceof Sequence);
-                    if (!children.isEmpty()) {
-                        if (allSequences) {
-                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                            for (Object child : children) {
+                    // Priority levels
+                    if (!children.isEmpty() && children.iterator().next() instanceof List<?>) {
+                        for (Object child : (List<Object>) children.iterator().next()) {
+                            priorityLevels.add((PriorityLevel) child);
+                        }
+                    } else {
+                        PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                        for (Object child : children) {
+                            if (child instanceof Alternative) {
+                                priorityLevelBuilder.addAlternative((Alternative) child);
+                            } else { // Sequence
                                 Alternative.Builder alternativeBuilder = new Alternative.Builder();
                                 alternativeBuilder.addSequence((Sequence) child);
                                 priorityLevelBuilder.addAlternative(alternativeBuilder.build());
                             }
-                            priorityLevels.add(priorityLevelBuilder.build());
-                        } else {
-                            for (Object child : children) {
-                                if (child instanceof List<?>) {
-                                    priorityLevels.addAll((List<PriorityLevel>) child);
-                                } else if (child instanceof PriorityLevel) {
-                                    priorityLevels.add((PriorityLevel) child);
-                                } else if (child instanceof Alternative) {
-                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                                    priorityLevelBuilder.addAlternative((Alternative) child);
-                                    priorityLevels.add(priorityLevelBuilder.build());
-                                } else { // Sequence
-                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                                    Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                                    alternativeBuilder.addSequence((Sequence) child);
-                                    priorityLevelBuilder.addAlternative(alternativeBuilder.build());
-                                    priorityLevels.add(priorityLevelBuilder.build());
-                                }
-                            }
                         }
+                        priorityLevels.add(priorityLevelBuilder.build());
                     }
-
-                    System.out.println(">>>>> priority levels: " + priorityLevels);
                     return priorityLevels;
                 }
                 case "prod": {
@@ -202,7 +186,6 @@ public class RascalGrammarToIguanaGrammarConverter {
                         } else if (child instanceof PriorityLevel) {
                             priorityLevels.add((PriorityLevel) child);
                         } else if (child instanceof List<?>) {
-                            System.out.println("List size: " + ((List<?>) child).size());
                             for (Object c : (List<?>) child) {
                                 if (c instanceof PriorityLevel) {
                                     priorityLevels.add((PriorityLevel) c);
