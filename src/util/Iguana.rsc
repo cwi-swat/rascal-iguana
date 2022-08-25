@@ -10,11 +10,11 @@ syntax A
   | D+
   ;
 
-//syntax E
-//  = left E "*" E
-//  > left E "+" E
-//  | "a"
-//  ;
+syntax E
+  = left E "*" E
+  > left E "+" E
+  | "a"
+  ;
 
 // syntax E
 //  = left (E "*" E | E "/" E)

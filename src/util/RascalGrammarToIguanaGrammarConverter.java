@@ -9,6 +9,7 @@ import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class RascalGrammarToIguanaGrammarConverter {
 
@@ -80,6 +81,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 Object res = elem.accept(this);
                 if (res != null) list.add(res);
             }
+            System.out.println(">>>>> list: " + o.size() + " " + o + " res: " + list);
             return list;
         }
 
@@ -125,27 +127,44 @@ public class RascalGrammarToIguanaGrammarConverter {
                     if (isLayout(o.get(0))) {
                         layouts.add(head.getName());
                     }
-                    Set<Object> children = (Set<Object>) visitedChildren.get(1);
-                    ISet alternatives = (ISet) o.get("alternatives");
 
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
-                    for (Object object : children) {
-                        if (object instanceof PriorityLevel) {
-                            priorityLevels.add((PriorityLevel) object);
-                        } else if (object instanceof Alternative) {
+
+                    Set<Object> children = (Set<Object>) visitedChildren.get(1);
+                    System.out.println(">>>>>>classes: " + children.stream().map(child -> child.getClass()).collect(Collectors.toList()));
+
+                    boolean allSequences = children.stream().allMatch(c -> c instanceof Sequence);
+                    if (!children.isEmpty()) {
+                        if (allSequences) {
                             PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                            priorityLevelBuilder.addAlternative((Alternative) object);
-                            priorityLevels.add(priorityLevelBuilder.build());
-                        } else if (object instanceof Sequence) {
-                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                            Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                            alternativeBuilder.addSequence((Sequence) object);
-                            priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                            for (Object child : children) {
+                                Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                                alternativeBuilder.addSequence((Sequence) child);
+                                priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                            }
                             priorityLevels.add(priorityLevelBuilder.build());
                         } else {
-                            throw new IllegalStateException(object.getClass() + "");
+                            for (Object child : children) {
+                                if (child instanceof List<?>) {
+                                    priorityLevels.addAll((List<PriorityLevel>) child);
+                                } else if (child instanceof PriorityLevel) {
+                                    priorityLevels.add((PriorityLevel) child);
+                                } else if (child instanceof Alternative) {
+                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                                    priorityLevelBuilder.addAlternative((Alternative) child);
+                                    priorityLevels.add(priorityLevelBuilder.build());
+                                } else { // Sequence
+                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                                    Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                                    alternativeBuilder.addSequence((Sequence) child);
+                                    priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                                    priorityLevels.add(priorityLevelBuilder.build());
+                                }
+                            }
                         }
                     }
+
+                    System.out.println(">>>>> priority levels: " + priorityLevels);
                     return priorityLevels;
                 }
                 case "prod": {
@@ -155,7 +174,8 @@ public class RascalGrammarToIguanaGrammarConverter {
                         if (!layouts.contains(symbol.getName()))
                             sequenceBuilder.addSymbol(symbol);
                     }
-                    return new Alternative.Builder().addSequence(sequenceBuilder.build()).build();
+
+                    return sequenceBuilder.build();
                 }
                 case "sort": {
                     String nonterminalName = (String) visitedChildren.get(0);
@@ -170,10 +190,33 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return new Nonterminal.Builder(nonterminalName).build();
                 }
                 case "priority": {
-                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                    List<Alternative> alternatives = (List<Alternative>) visitedChildren.get(1);
-                    priorityLevelBuilder.addAlternatives(alternatives);
-                    return priorityLevelBuilder.build();
+                    List<PriorityLevel> priorityLevels = new ArrayList<>();
+
+                    List<Object> children = (List<Object>) visitedChildren.get(1);
+
+                    for (Object child : children) {
+                        if (child instanceof Alternative) {
+                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                            priorityLevelBuilder.addAlternative((Alternative) child);
+                            priorityLevels.add(priorityLevelBuilder.build());
+                        } else if (child instanceof PriorityLevel) {
+                            priorityLevels.add((PriorityLevel) child);
+                        } else if (child instanceof List<?>) {
+                            System.out.println("List size: " + ((List<?>) child).size());
+                            for (Object c : (List<?>) child) {
+                                if (c instanceof PriorityLevel) {
+                                    priorityLevels.add((PriorityLevel) c);
+                                } else {
+                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                                    List<Alternative> alternatives = (List<Alternative>) visitedChildren.get(1);
+                                    priorityLevelBuilder.addAlternatives(alternatives);
+                                    priorityLevels.add(priorityLevelBuilder.build());
+                                }
+                            }
+                        }
+                    }
+
+                    return priorityLevels;
                 }
                 case "assoc": {
                     Alternative.Builder alternativeBuilder = new Alternative.Builder();
@@ -221,6 +264,12 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 case "left": {
                     return Associativity.LEFT;
+                }
+                case "right": {
+                    return Associativity.RIGHT;
+                }
+                case "non-assoc": {
+                    return Associativity.NON_ASSOC;
                 }
                 default:
                     throw new RuntimeException("Unknown name: " + o.getName());
