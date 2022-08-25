@@ -134,6 +134,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     // Priority levels
                     if (!children.isEmpty() && children.iterator().next() instanceof List<?>) {
                         for (Object child : (List<Object>) children.iterator().next()) {
+                            System.out.println("child class:" + child.getClass());
                             priorityLevels.add((PriorityLevel) child);
                         }
                     } else {
@@ -179,7 +180,13 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<Object> children = (List<Object>) visitedChildren.get(1);
 
                     for (Object child : children) {
-                        if (child instanceof Alternative) {
+                        if (child instanceof Sequence) {
+                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                            Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                            alternativeBuilder.addSequence((Sequence) child);
+                            priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                            priorityLevels.add(priorityLevelBuilder.build());
+                        } else if (child instanceof Alternative) {
                             PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
                             priorityLevelBuilder.addAlternative((Alternative) child);
                             priorityLevels.add(priorityLevelBuilder.build());
