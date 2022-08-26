@@ -3,6 +3,10 @@ module util::Iguana
 extend ParseTree;
 import IO;
 
+start syntax S
+  = A
+  ;
+
 syntax A
   = "a" D C
   | B*

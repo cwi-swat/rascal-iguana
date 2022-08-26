@@ -23,13 +23,14 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
         Set<String> layouts = new HashSet<>();
+        ValueVisitor visitor = new ValueVisitor(layouts);
+
         while (entryIterator.hasNext()) {
             Map.Entry<IValue, IValue> next = entryIterator.next();
             IValue key = next.getKey();
             IValue value = next.getValue();
             System.out.println(key + " = " + value + " " + value.getType() + " " + value.getType().getName());
 
-            ValueVisitor visitor = new ValueVisitor(layouts);
             try {
                 Nonterminal head = (Nonterminal) key.accept(visitor);
                 Rule.Builder ruleBuilder = new Rule.Builder(head);
@@ -47,12 +48,15 @@ public class RascalGrammarToIguanaGrammarConverter {
             }
         }
 
-        return grammarBuilder.build();
+        return grammarBuilder
+            .setStartSymbol(visitor.start)
+            .build();
     }
 
     static class ValueVisitor implements IValueVisitor<Object, Throwable> {
 
         private final Set<String> layouts;
+        private Start start;
 
         public ValueVisitor(Set<String> layouts) {
             this.layouts = layouts;
@@ -258,6 +262,11 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 case "non-assoc": {
                     return Associativity.NON_ASSOC;
+                }
+                case "start": {
+                    Nonterminal nonterminal = (Nonterminal) visitedChildren.get(0);
+                    start = Start.from(nonterminal.getName());
+                    return start;
                 }
                 default:
                     throw new RuntimeException("Unknown name: " + o.getName());
