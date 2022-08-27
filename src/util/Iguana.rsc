@@ -31,6 +31,12 @@ lexical D = "d";
 
 layout L = " ";
 
+lexical WhitespaceAndComment
+   = [\ \t\n\r]
+   | @category="Comment" "%" ![%]+ "%"
+   | @category="Comment" "%%" ![\n]* $
+   ;
+
 alias Parser[&T] = &T (str input, loc origin);
 
 @javaClass{util.ParserGenerator}

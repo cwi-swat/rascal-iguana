@@ -266,7 +266,12 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "start": {
                     Nonterminal nonterminal = (Nonterminal) visitedChildren.get(0);
                     start = Start.from(nonterminal.getName());
-                    return start;
+                    return nonterminal;
+                }
+                case "label": {
+                    String label = (String) visitedChildren.get(0);
+                    Nonterminal nonterminal = (Nonterminal) visitedChildren.get(1);
+                    return nonterminal.copy().setLabel(label).build();
                 }
                 default:
                     throw new RuntimeException("Unknown name: " + o.getName());
