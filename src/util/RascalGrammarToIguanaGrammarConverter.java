@@ -2,7 +2,6 @@ package util;
 
 import io.usethesource.vallang.*;
 import io.usethesource.vallang.visitors.IValueVisitor;
-import org.apache.lucene.index.Term;
 import org.iguana.grammar.Grammar;
 import org.iguana.grammar.condition.Condition;
 import org.iguana.grammar.condition.ConditionType;
@@ -13,7 +12,6 @@ import org.iguana.grammar.symbol.*;
 import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
-import org.iguana.regex.visitor.RegularExpressionVisitor;
 import org.iguana.util.Tuple;
 import org.rascalmpl.ast.Sym;
 
@@ -119,6 +117,9 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Tuple<String, Object> visitNode(INode o) throws Throwable {
+            if (o.arity() == 0) {
+                return Tuple.of(o.getName(), null);
+            }
             Object value = o.get(0).accept(this);
             return Tuple.of(o.getName(), value);
         }
@@ -146,6 +147,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     Set<Object> children = (Set<Object>) visitedChildren.get(1);
 
                     // Priority levels
+                    System.out.println(">>>>> classes: " + children.stream().map(child -> child.getClass()).collect(Collectors.toList()));
                     if (!children.isEmpty() && children.iterator().next() instanceof List<?>) {
                         for (Object child : (List<Object>) children.iterator().next()) {
                             priorityLevels.add((PriorityLevel) child);
@@ -155,10 +157,13 @@ public class RascalGrammarToIguanaGrammarConverter {
                         for (Object child : children) {
                             if (child instanceof Alternative) {
                                 priorityLevelBuilder.addAlternative((Alternative) child);
-                            } else { // Sequence
+                            } else if (child instanceof Sequence) {
                                 Alternative.Builder alternativeBuilder = new Alternative.Builder();
                                 alternativeBuilder.addSequence((Sequence) child);
                                 priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                            } else {
+                                System.out.println(">>>>> list: " + child);
+                                throw new RuntimeException(">>>>>>>>: " + child.getClass());
                             }
                         }
                         priorityLevels.add(priorityLevelBuilder.build());
@@ -186,10 +191,12 @@ public class RascalGrammarToIguanaGrammarConverter {
                     }
                     return sequenceBuilder.build();
                 }
+                case "parameterized-sort":
                 case "sort": {
                     String nonterminalName = (String) visitedChildren.get(0);
                     return new Nonterminal.Builder(nonterminalName).build();
                 }
+                case "keyword":
                 case "lex": {
                     String nonterminalName = (String) visitedChildren.get(0);
                     return new Nonterminal.Builder(nonterminalName).build();
@@ -244,6 +251,24 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return new Terminal.Builder(regex)
                         .setNodeType(TerminalNodeType.Regex)
                         .build();
+                }
+                case "alt": {
+                   Alt.Builder altBuilder = new Alt.Builder();
+                   for (Object child : visitedChildren) {
+                       altBuilder.add((Symbol) child);
+                   }
+                   return altBuilder.build();
+                }
+                case "opt": {
+                    Symbol symbol = (Symbol) o.get(0).accept(this);
+                    return Opt.from(symbol);
+                }
+                case "seq": {
+                    Group.Builder groupBuilder = new Group.Builder();
+                    for (Object child : visitedChildren) {
+                        groupBuilder.add((Symbol) child);
+                    }
+                    return groupBuilder.build();
                 }
                 case "iter": {
                     Symbol symbol = (Symbol) o.get(0).accept(this);
@@ -306,27 +331,85 @@ public class RascalGrammarToIguanaGrammarConverter {
                     Integer start = (Integer) visitedChildren.get(0);
                     Integer end = (Integer) visitedChildren.get(1);
                     return CharRange.in(start, end);
-                 }
+                }
                 case "char-class": {
                     List<CharRange> ranges = (List<CharRange>) visitedChildren.get(0);
                     List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
                     return Alt.from(terminals);
-                 }
+                }
+                case "follow": {
+                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    if (isRegex(symbol)) {
+                        return RegularExpressionCondition.follow(getRegex(symbol));
+                    } else {
+                        throw new RuntimeException("Must only be a regular expression: " + symbol);
+                    }
+                }
                 case "not-follow": {
                     Symbol symbol = (Symbol) visitedChildren.get(0);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.notFollow(getRegex(symbol));
                     } else {
-                        throw new RuntimeException("Not follow can only be a regular expression: " + symbol);
+                        throw new RuntimeException("Must only be a regular expression: " + symbol);
                     }
+                }
+                case "not-precede": {
+                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    if (isRegex(symbol)) {
+                        return RegularExpressionCondition.notPrecede(getRegex(symbol));
+                    } else {
+                        throw new RuntimeException("Must only be a regular expression: " + symbol);
+                    }
+                }
+                case "precede": {
+                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    if (isRegex(symbol)) {
+                        return RegularExpressionCondition.precede(getRegex(symbol));
+                    } else {
+                        throw new RuntimeException("Must only be a regular expression: " + symbol);
+                    }
+                }
+                case "except": {
+                    String except = (String) visitedChildren.get(0);
+                    return Identifier.fromName(except);
+                }
+                case "keywords": {
+                    String keywords = (String) visitedChildren.get(0);
+                    return Identifier.fromName(keywords);
                 }
                 case "end-of-line": {
                     return new PositionalCondition(ConditionType.END_OF_LINE);
                 }
+                case "begin-of-line": {
+                    return new PositionalCondition(ConditionType.START_OF_LINE);
+                }
                 case "conditional": {
-                    Symbol symbol = (Symbol) visitedChildren.get(0);
-                    Set<Condition> conditions = (Set<Condition>) visitedChildren.get(1);
-                    return symbol.copy().addPostConditions(conditions).build();
+                    Set<Object> conditions = (Set<Object>) visitedChildren.get(1);
+                    for (Object obj : conditions) {
+                        Symbol symbol = (Symbol) visitedChildren.get(0);
+                        SymbolBuilder<? extends Symbol> builder = symbol.copy();
+                        if (obj instanceof Condition) {
+                            Condition condition = (Condition) obj;
+                            switch (condition.getType()) {
+                                case FOLLOW:
+                                case NOT_FOLLOW:
+                                case END_OF_FILE:
+                                    builder.addPostCondition(condition);
+                                    break;
+                                case START_OF_LINE:
+                                case PRECEDE:
+                                case NOT_PRECEDE:
+                                    builder.addPreCondition(condition);
+                                    break;
+                            }
+                            return builder.build();
+                        } else {
+                            assert obj instanceof Identifier;
+                            assert visitedChildren.get(0) instanceof Nonterminal;
+                            Nonterminal nonterminal = (Nonterminal) visitedChildren.get(0);
+                            return nonterminal.copy().addExcept(((Identifier) obj).getName()).build();
+                        }
+                    }
                 }
                 case "tag": {
                     return visitedChildren.get(0);
@@ -368,6 +451,9 @@ public class RascalGrammarToIguanaGrammarConverter {
             if (symbol instanceof Terminal) {
                 return true;
             }
+            if (symbol instanceof Identifier) {
+                return true;
+            }
             if (symbol instanceof Alt) {
                 Alt alt = (Alt) symbol;
                 return alt.getChildren().stream().allMatch(ValueVisitor::isRegex);
@@ -394,6 +480,9 @@ public class RascalGrammarToIguanaGrammarConverter {
         private static RegularExpression getRegex(Symbol symbol) {
             if (symbol instanceof Terminal) {
                 return ((Terminal) symbol).getRegularExpression();
+            }
+            if (symbol instanceof Identifier) {
+                return org.iguana.regex.Reference.from(symbol.getName());
             }
             if (symbol instanceof Alt) {
                 Alt alt = (Alt) symbol;
