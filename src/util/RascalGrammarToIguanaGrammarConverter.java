@@ -167,6 +167,12 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 case "prod": {
                     Sequence.Builder sequenceBuilder = new Sequence.Builder();
+
+                    Symbol first = (Symbol) visitedChildren.get(0);
+                    if (first.getLabel() != null) {
+                        sequenceBuilder.setLabel(first.getLabel());
+                    }
+
                     List<Symbol> symbols = (List<Symbol>) visitedChildren.get(1);
                     for (Symbol symbol : symbols) {
                         if (!layouts.contains(symbol.getName()))
@@ -293,8 +299,8 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 case "label": {
                     String label = (String) visitedChildren.get(0);
-                    Nonterminal nonterminal = (Nonterminal) visitedChildren.get(1);
-                    return nonterminal.copy().setLabel(label).build();
+                    Symbol symbol = (Symbol) visitedChildren.get(1);
+                    return symbol.copy().setLabel(label).build();
                 }
                 case "range": {
                     Integer start = (Integer) visitedChildren.get(0);
@@ -325,8 +331,11 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "tag": {
                     return visitedChildren.get(0);
                 }
+                case "bracket": {
+                    return Tuple.of("bracket", null);
+                }
                 default:
-                    throw new RuntimeException("Unknown name: " + o.getName());
+                    throw new RuntimeException("Unknown constructor name: " + o.getName());
             }
         }
 

@@ -29,6 +29,27 @@ syntax C = "c";
 
 lexical D = "d";
 
+syntax Type
+  = natural:"natural"
+  | string :"string"
+  | nil    :"nil-type"
+  ;
+
+syntax Expression
+  = id: Id name
+  | strcon: String string
+  | natcon: Natural natcon
+  | bracket "(" Expression e ")"
+  > left concat: Expression lhs "||" Expression rhs
+  > left ( add: Expression lhs "+" Expression rhs
+         | min: Expression lhs "-" Expression rhs
+         )
+  ;
+
+lexical Id  = [a-z][a-z0-9]* !>> [a-z0-9];
+lexical Natural = [0-9]+ ;
+lexical String = "\"" ![\"]*  "\"";
+
 layout Layout = WhitespaceAndComment* !>> [\ \t\n\r%];
 
 lexical WhitespaceAndComment
