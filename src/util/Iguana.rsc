@@ -29,7 +29,7 @@ syntax C = "c";
 
 lexical D = "d";
 
-layout L = " ";
+layout Layout = WhitespaceAndComment* !>> [\ \t\n\r%];
 
 lexical WhitespaceAndComment
    = [\ \t\n\r]

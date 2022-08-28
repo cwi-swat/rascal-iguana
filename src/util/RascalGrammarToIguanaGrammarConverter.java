@@ -2,16 +2,20 @@ package util;
 
 import io.usethesource.vallang.*;
 import io.usethesource.vallang.visitors.IValueVisitor;
+import org.apache.lucene.index.Term;
 import org.iguana.grammar.Grammar;
 import org.iguana.grammar.condition.Condition;
 import org.iguana.grammar.condition.ConditionType;
 import org.iguana.grammar.condition.PositionalCondition;
+import org.iguana.grammar.condition.RegularExpressionCondition;
 import org.iguana.grammar.slot.TerminalNodeType;
 import org.iguana.grammar.symbol.*;
 import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
+import org.iguana.regex.visitor.RegularExpressionVisitor;
 import org.iguana.util.Tuple;
+import org.rascalmpl.ast.Sym;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -302,6 +306,14 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
                     return Alt.from(terminals);
                  }
+                case "not-follow": {
+                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    if (isRegex(symbol)) {
+                        return RegularExpressionCondition.notFollow(getRegex(symbol));
+                    } else {
+                        throw new RuntimeException("Not follow can only be a regular expression: " + symbol);
+                    }
+                }
                 case "end-of-line": {
                     return new PositionalCondition(ConditionType.END_OF_LINE);
                 }
@@ -341,6 +353,62 @@ public class RascalGrammarToIguanaGrammarConverter {
         @Override
         public Object visitDateTime(IDateTime o) {
             throw new RuntimeException(o.toString());
+        }
+
+        private static boolean isRegex(Symbol symbol) {
+            if (symbol instanceof Terminal) {
+                return true;
+            }
+            if (symbol instanceof Alt) {
+                Alt alt = (Alt) symbol;
+                return alt.getChildren().stream().allMatch(ValueVisitor::isRegex);
+            }
+            if (symbol instanceof Star) {
+                Star star = (Star) symbol;
+                return isRegex(star.getSymbol());
+            }
+            if (symbol instanceof Plus) {
+                Plus plus = (Plus) symbol;
+                return isRegex(plus.getSymbol());
+            }
+            if (symbol instanceof Opt) {
+                Opt opt = (Opt) symbol;
+                return isRegex(opt.getSymbol());
+            }
+            if (symbol instanceof Group) {
+                Group group = (Group) symbol;
+                return group.getChildren().stream().allMatch(ValueVisitor::isRegex);
+            }
+            return false;
+        }
+
+        private static RegularExpression getRegex(Symbol symbol) {
+            if (symbol instanceof Terminal) {
+                return ((Terminal) symbol).getRegularExpression();
+            }
+            if (symbol instanceof Alt) {
+                Alt alt = (Alt) symbol;
+                List<RegularExpression> regexes = alt.getChildren().stream().map(ValueVisitor::getRegex).collect(Collectors.toList());
+                return org.iguana.regex.Alt.from(regexes);
+            }
+            if (symbol instanceof Star) {
+                Star star = (Star) symbol;
+                return org.iguana.regex.Star.from(getRegex(star.getSymbol()));
+            }
+            if (symbol instanceof Plus) {
+                Plus plus = (Plus) symbol;
+                return org.iguana.regex.Plus.from(getRegex(plus.getSymbol()));
+            }
+            if (symbol instanceof Opt) {
+                Opt opt = (Opt) symbol;
+                return org.iguana.regex.Opt.from(getRegex(opt.getSymbol()));
+            }
+            if (symbol instanceof Group) {
+                Group group = (Group) symbol;
+                List<RegularExpression> regexes = group.getChildren().stream().map(ValueVisitor::getRegex).collect(Collectors.toList());
+                return org.iguana.regex.Seq.from(regexes);
+            }
+            throw new RuntimeException("Should not reach here");
         }
     }
 }
