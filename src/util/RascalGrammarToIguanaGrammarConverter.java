@@ -3,12 +3,18 @@ package util;
 import io.usethesource.vallang.*;
 import io.usethesource.vallang.visitors.IValueVisitor;
 import org.iguana.grammar.Grammar;
+import org.iguana.grammar.condition.Condition;
+import org.iguana.grammar.condition.ConditionType;
+import org.iguana.grammar.condition.PositionalCondition;
 import org.iguana.grammar.slot.TerminalNodeType;
 import org.iguana.grammar.symbol.*;
+import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
+import org.iguana.util.Tuple;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class RascalGrammarToIguanaGrammarConverter {
 
@@ -98,18 +104,19 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         @Override
-        public Object visitSourceLocation(ISourceLocation o) throws Throwable {
-            throw new RuntimeException();
+        public Object visitSourceLocation(ISourceLocation o) {
+            throw new RuntimeException(o.toString());
         }
 
         @Override
-        public Object visitTuple(ITuple o) throws Throwable {
-            throw new RuntimeException();
+        public Object visitTuple(ITuple o) {
+            throw new RuntimeException(o.toString());
         }
 
         @Override
-        public Object visitNode(INode o) throws Throwable {
-            throw new RuntimeException();
+        public Tuple<String, Object> visitNode(INode o) throws Throwable {
+            Object value = o.get(0).accept(this);
+            return Tuple.of(o.getName(), value);
         }
 
         private boolean isLayout(IValue value) {
@@ -162,6 +169,11 @@ public class RascalGrammarToIguanaGrammarConverter {
                             sequenceBuilder.addSymbol(symbol);
                     }
 
+                    // attributes
+                    Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) visitedChildren.get(2);
+                    for (Tuple<String, Object> attribute : attributes) {
+                        sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
+                    }
                     return sequenceBuilder.build();
                 }
                 case "sort": {
@@ -211,8 +223,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return priorityLevels;
                 }
                 case "assoc": {
-                    Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                    return alternativeBuilder.build();
+                    return Tuple.of(o.getName(), visitedChildren.get(0));
                 }
                 case "empty": {
                     return new Nonterminal.Builder("empty").build();
@@ -224,6 +235,10 @@ public class RascalGrammarToIguanaGrammarConverter {
                         .setNodeType(TerminalNodeType.Regex)
                         .build();
                 }
+                case "iter": {
+                    Symbol symbol = (Symbol) o.get(0).accept(this);
+                    return new Plus.Builder(symbol).build();
+                }
                 case "iter-seps": {
                     Symbol symbol = (Symbol) o.get(0).accept(this);
                     List<Symbol> separators = (List<Symbol>) o.get(1).accept(this);
@@ -234,6 +249,10 @@ public class RascalGrammarToIguanaGrammarConverter {
                         }
                     }
                     return plusBuilder.build();
+                }
+                case "iter-star": {
+                    Symbol symbol = (Symbol) o.get(0).accept(this);
+                    return new Star.Builder(symbol).build();
                 }
                 case "iter-star-seps": {
                     Symbol symbol = (Symbol) o.get(0).accept(this);
@@ -273,34 +292,55 @@ public class RascalGrammarToIguanaGrammarConverter {
                     Nonterminal nonterminal = (Nonterminal) visitedChildren.get(1);
                     return nonterminal.copy().setLabel(label).build();
                 }
+                case "range": {
+                    Integer start = (Integer) visitedChildren.get(0);
+                    Integer end = (Integer) visitedChildren.get(1);
+                    return CharRange.in(start, end);
+                 }
+                case "char-class": {
+                    List<CharRange> ranges = (List<CharRange>) visitedChildren.get(0);
+                    List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
+                    return Alt.from(terminals);
+                 }
+                case "end-of-line": {
+                    return new PositionalCondition(ConditionType.END_OF_LINE);
+                }
+                case "conditional": {
+                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    Set<Condition> conditions = (Set<Condition>) visitedChildren.get(1);
+                    return symbol.copy().addPostConditions(conditions).build();
+                }
+                case "tag": {
+                    return visitedChildren.get(0);
+                }
                 default:
                     throw new RuntimeException("Unknown name: " + o.getName());
             }
         }
 
         @Override
-        public Object visitInteger(IInteger o) throws Throwable {
-            throw new RuntimeException();
+        public Integer visitInteger(IInteger o) {
+            return o.intValue();
         }
 
         @Override
-        public Object visitMap(IMap o) throws Throwable {
-            throw new RuntimeException();
+        public Object visitMap(IMap o) {
+            throw new RuntimeException(o.toString());
         }
 
         @Override
-        public Object visitBoolean(IBool boolValue) throws Throwable {
-            throw new RuntimeException();
+        public Object visitBoolean(IBool boolValue) {
+            throw new RuntimeException(boolValue.toString());
         }
 
         @Override
-        public Object visitExternal(IExternalValue externalValue) throws Throwable {
-            throw new RuntimeException();
+        public Object visitExternal(IExternalValue externalValue) {
+            throw new RuntimeException(externalValue.toString());
         }
 
         @Override
-        public Object visitDateTime(IDateTime o) throws Throwable {
-            throw new RuntimeException();
+        public Object visitDateTime(IDateTime o) {
+            throw new RuntimeException(o.toString());
         }
     }
 }
