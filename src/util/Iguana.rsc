@@ -29,6 +29,21 @@ syntax C = "c";
 
 lexical D = "d";
 
+start syntax Program
+  = program: "begin" Declarations decls {Statement  ";"}* body "end" ;
+
+syntax Declarations
+  = "declare" {IdType ","}* decls ";" ;
+
+syntax IdType = idtype: Id id ":" Type t;
+
+syntax Statement
+  = assign: Id var ":="  Expression val
+  | cond: "if" Expression cond "then" {Statement ";"}*  thenPart "else" {Statement ";"}* elsePart "fi"
+  | cond: "if" Expression cond "then" {Statement ";"}*  thenPart "fi"
+  | loop: "while" Expression cond "do" {Statement ";"}* body "od"
+  ;
+
 syntax Type
   = natural:"natural"
   | string :"string"
