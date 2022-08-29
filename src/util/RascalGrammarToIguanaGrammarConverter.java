@@ -13,7 +13,6 @@ import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
 import org.iguana.util.Tuple;
-import org.rascalmpl.ast.Sym;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -129,6 +128,32 @@ public class RascalGrammarToIguanaGrammarConverter {
             return ((IConstructor) value).getName().equals("layouts");
         }
 
+        private void addChildren(Collection<Object> children, List<PriorityLevel> priorityLevels) {
+            boolean allPriorityLevels = children.stream().allMatch(child -> child instanceof PriorityLevel);
+            if (allPriorityLevels) {
+                for (Object child : children) {
+                    priorityLevels.add((PriorityLevel) child);
+                }
+            } else {
+                for (Object child : children) {
+                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                    if (child instanceof Alternative) {
+                        priorityLevelBuilder.addAlternative((Alternative) child);
+                        priorityLevels.add(priorityLevelBuilder.build());
+                    } else if (child instanceof Sequence) {
+                        Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                        alternativeBuilder.addSequence((Sequence) child);
+                        priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                        priorityLevels.add(priorityLevelBuilder.build());
+                    } else if (child instanceof List<?>) {
+                        addChildren((List<Object>) child, priorityLevels);
+                    } else {
+                        throw new RuntimeException(">>>>>>>>: " + child.getClass());
+                    }
+                }
+            }
+        }
+
         @Override
         public Object visitConstructor(IConstructor o) throws Throwable {
             List<Object> visitedChildren = new ArrayList<>();
@@ -145,29 +170,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
                     Set<Object> children = (Set<Object>) visitedChildren.get(1);
-
-                    // Priority levels
-                    System.out.println(">>>>> classes: " + children.stream().map(child -> child.getClass()).collect(Collectors.toList()));
-                    if (!children.isEmpty() && children.iterator().next() instanceof List<?>) {
-                        for (Object child : (List<Object>) children.iterator().next()) {
-                            priorityLevels.add((PriorityLevel) child);
-                        }
-                    } else {
-                        PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                        for (Object child : children) {
-                            if (child instanceof Alternative) {
-                                priorityLevelBuilder.addAlternative((Alternative) child);
-                            } else if (child instanceof Sequence) {
-                                Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                                alternativeBuilder.addSequence((Sequence) child);
-                                priorityLevelBuilder.addAlternative(alternativeBuilder.build());
-                            } else {
-                                System.out.println(">>>>> list: " + child);
-                                throw new RuntimeException(">>>>>>>>: " + child.getClass());
-                            }
-                        }
-                        priorityLevels.add(priorityLevelBuilder.build());
-                    }
+                    addChildren(children, priorityLevels);
                     return priorityLevels;
                 }
                 case "prod": {
@@ -265,7 +268,9 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 case "seq": {
                     Group.Builder groupBuilder = new Group.Builder();
+                    System.out.println("visited children: " + visitedChildren);
                     for (Object child : visitedChildren) {
+                        System.out.println(">>>>> seq child: " + child);
                         groupBuilder.add((Symbol) child);
                     }
                     return groupBuilder.build();
