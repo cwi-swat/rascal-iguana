@@ -13,6 +13,7 @@ import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
 import org.iguana.util.Tuple;
+import org.rascalmpl.ast.Sym;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -89,7 +90,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             List<Object> list = new ArrayList<>();
             for (IValue elem : o) {
                 Object res = elem.accept(this);
-                if (res != null) list.add(res);
+                list.add(res);
             }
             return list;
         }
@@ -255,33 +256,30 @@ public class RascalGrammarToIguanaGrammarConverter {
                         .setNodeType(TerminalNodeType.Regex)
                         .build();
                 }
+                // alt(set[Symbol] alternatives)
                 case "alt": {
-                   Alt.Builder altBuilder = new Alt.Builder();
-                   for (Object child : visitedChildren) {
-                       altBuilder.add((Symbol) child);
-                   }
-                   return altBuilder.build();
+                   Set<Symbol> symbols = (Set<Symbol>) o.get("alternatives").accept(this);
+                   return Alt.from(new ArrayList<>(symbols));
                 }
+                // opt(Symbol symbol)
                 case "opt": {
-                    Symbol symbol = (Symbol) o.get(0).accept(this);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
                     return Opt.from(symbol);
                 }
+                // seq(list[Symbol] symbols)
                 case "seq": {
-                    Group.Builder groupBuilder = new Group.Builder();
-                    System.out.println("visited children: " + visitedChildren);
-                    for (Object child : visitedChildren) {
-                        System.out.println(">>>>> seq child: " + child);
-                        groupBuilder.add((Symbol) child);
-                    }
-                    return groupBuilder.build();
+                    List<Symbol> symbols = (List<Symbol>) o.get("symbols").accept(this);
+                    return Group.from(symbols);
                 }
+                // iter(Symbol symbol)
                 case "iter": {
-                    Symbol symbol = (Symbol) o.get(0).accept(this);
-                    return new Plus.Builder(symbol).build();
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    return Plus.from(symbol);
                 }
+                // iter-seps(Symbol symbol, list[Symbol] separators)
                 case "iter-seps": {
-                    Symbol symbol = (Symbol) o.get(0).accept(this);
-                    List<Symbol> separators = (List<Symbol>) o.get(1).accept(this);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    List<Symbol> separators = (List<Symbol>) o.get("separators").accept(this);
                     Plus.Builder plusBuilder = new Plus.Builder(symbol);
                     for (Symbol separator : separators) {
                         if (!layouts.contains(separator.getName())) {
@@ -290,13 +288,15 @@ public class RascalGrammarToIguanaGrammarConverter {
                     }
                     return plusBuilder.build();
                 }
+                // iter-star(Symbol symbol)
                 case "iter-star": {
-                    Symbol symbol = (Symbol) o.get(0).accept(this);
-                    return new Star.Builder(symbol).build();
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    return Star.from(symbol);
                 }
+                // iter-star-seps(Symbol symbol, list[Symbol] separators)
                 case "iter-star-seps": {
-                    Symbol symbol = (Symbol) o.get(0).accept(this);
-                    List<Symbol> separators = (List<Symbol>) o.get(1).accept(this);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    List<Symbol> separators = (List<Symbol>) o.get("separators").accept(this);
                     Star.Builder starBuilder = new Star.Builder(symbol);
                     for (Symbol separator : separators) {
                         if (!layouts.contains(separator.getName())) {
