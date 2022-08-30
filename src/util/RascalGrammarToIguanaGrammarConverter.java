@@ -19,11 +19,6 @@ import java.util.stream.Collectors;
 
 public class RascalGrammarToIguanaGrammarConverter {
 
-    private boolean isLexical(IValue value) {
-        if (!(value instanceof IConstructor)) return false;
-        return ((IConstructor) value).getName().equals("lex");
-    }
-
     public Grammar convert(IConstructor grammar) {
         Grammar.Builder grammarBuilder = new Grammar.Builder();
         IMap definitions = (IMap) grammar.get("definitions");
@@ -39,17 +34,8 @@ public class RascalGrammarToIguanaGrammarConverter {
             System.out.println(key + " = " + value + " " + value.getType() + " " + value.getType().getName());
 
             try {
-                Nonterminal head = (Nonterminal) key.accept(visitor);
-                Rule.Builder ruleBuilder = new Rule.Builder(head);
-                List<PriorityLevel> priorityLevels = (List<PriorityLevel>) value.accept(visitor);
-                ruleBuilder.addPriorityLevels(priorityLevels);
-                LayoutStrategy layoutStrategy = LayoutStrategy.INHERITED;
-                if (isLexical(key)) {
-                    layoutStrategy = LayoutStrategy.NO_LAYOUT;
-                }
-
-                ruleBuilder.setLayoutStrategy(layoutStrategy);
-                grammarBuilder.addRule(ruleBuilder.build());
+                Rule rule = (Rule) value.accept(visitor);
+                grammarBuilder.addRule(rule);
             } catch (Throwable e) {
                 e.printStackTrace();
             }
@@ -123,9 +109,14 @@ public class RascalGrammarToIguanaGrammarConverter {
             return Tuple.of(o.getName(), value);
         }
 
-        private boolean isLayout(IValue value) {
+        private static boolean isLayout(IValue value) {
             if (!(value instanceof IConstructor)) return false;
             return ((IConstructor) value).getName().equals("layouts");
+        }
+
+        private static boolean isLexical(IValue value) {
+            if (!(value instanceof IConstructor)) return false;
+            return ((IConstructor) value).getName().equals("lex");
         }
 
         private void addChildren(Collection<Object> children, List<PriorityLevel> priorityLevels) {
@@ -159,16 +150,26 @@ public class RascalGrammarToIguanaGrammarConverter {
             switch (cons.getName()) {
                 // choice(Symbol def, set[Production] alternatives)
                 case "choice": {
-                    Nonterminal head = (Nonterminal) cons.get("def").accept(this);
+                    Symbol head = (Symbol) cons.get("def").accept(this);
                     if (isLayout(cons.get(0))) {
                         layouts.add(head.getName());
                     }
 
+                    Rule.Builder ruleBuilder = new Rule.Builder(Nonterminal.withName(head.getName()));
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
                     Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
                     addChildren(alternatives, priorityLevels);
-                    return priorityLevels;
+
+                    ruleBuilder.addPriorityLevels(priorityLevels);
+                    LayoutStrategy layoutStrategy = LayoutStrategy.INHERITED;
+                    if (isLexical(cons.get("def"))) {
+                        layoutStrategy = LayoutStrategy.NO_LAYOUT;
+                    }
+
+                    ruleBuilder.setLayoutStrategy(layoutStrategy);
+
+                    return ruleBuilder.build();
                 }
                 // prod(Symbol def, list[Symbol] symbols, set[Attr] attributes)
                 case "prod": {
@@ -257,7 +258,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return Tuple.of(cons.getName(), cons.get("assoc").accept(this));
                 }
                 case "empty": {
-                    return new Nonterminal.Builder("empty").build();
+                    return new Terminal.Builder(Terminal.epsilon()).setName("empty");
                 }
                 // lit(str string)
                 case "lit": {
