@@ -155,18 +155,18 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         @Override
-        public Object visitConstructor(IConstructor o) throws Throwable {
-            switch (o.getName()) {
+        public Object visitConstructor(IConstructor cons) throws Throwable {
+            switch (cons.getName()) {
                 // choice(Symbol def, set[Production] alternatives)
                 case "choice": {
-                    Nonterminal head = (Nonterminal) o.get("def").accept(this);
-                    if (isLayout(o.get(0))) {
+                    Nonterminal head = (Nonterminal) cons.get("def").accept(this);
+                    if (isLayout(cons.get(0))) {
                         layouts.add(head.getName());
                     }
 
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
-                    Set<Object> alternatives = (Set<Object>) o.get("alternatives").accept(this);
+                    Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
                     addChildren(alternatives, priorityLevels);
                     return priorityLevels;
                 }
@@ -174,19 +174,19 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "prod": {
                     Sequence.Builder sequenceBuilder = new Sequence.Builder();
 
-                    Symbol first = (Symbol) o.get("def").accept(this);
+                    Symbol first = (Symbol) cons.get("def").accept(this);
                     if (first.getLabel() != null) {
                         sequenceBuilder.setLabel(first.getLabel());
                     }
 
-                    List<Symbol> symbols = (List<Symbol>) o.get("symbols").accept(this);
+                    List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
                     for (Symbol symbol : symbols) {
                         if (!layouts.contains(symbol.getName()))
                             sequenceBuilder.addSymbol(symbol);
                     }
 
                     // attributes
-                    Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) o.get("attributes").accept(this);
+                    Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) cons.get("attributes").accept(this);
                     for (Tuple<String, Object> attribute : attributes) {
                         sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
                     }
@@ -196,31 +196,31 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "parameterized-sort":
                 // sort(str name)
                 case "sort": {
-                    String nonterminalName = (String) o.get("name").accept(this);
+                    String nonterminalName = (String) cons.get("name").accept(this);
                     return Nonterminal.withName(nonterminalName);
                 }
                 // keywords(str name)
                 case "keywords": {
-                    String keywords = (String) o.get("name").accept(this);
+                    String keywords = (String) cons.get("name").accept(this);
                     return Identifier.fromName(keywords);
                 }
                 // parameterized-lex(str name, list[Symbol] parameters)
                 case "parametrized-lex":
                 // lex(str name)
                 case "lex": {
-                    String nonterminalName = (String) o.get("name").accept(this);
+                    String nonterminalName = (String) cons.get("name").accept(this);
                     return Nonterminal.withName(nonterminalName);
                 }
                 // layouts(str name)
                 case "layouts": {
-                    String nonterminalName = (String) o.get("name").accept(this);
+                    String nonterminalName = (String) cons.get("name").accept(this);
                     return Nonterminal.withName(nonterminalName);
                 }
                 // priority(Symbol def, list[Production] choices)
                 case "priority": {
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
-                    List<Object> choices = (List<Object>) o.get("choices").accept(this);
+                    List<Object> choices = (List<Object>) cons.get("choices").accept(this);
 
                     for (Object child : choices) {
                         if (child instanceof Sequence) {
@@ -254,14 +254,14 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // assoc(Associativity assoc)
                 case "assoc": {
-                    return Tuple.of(o.getName(), o.get("assoc").accept(this));
+                    return Tuple.of(cons.getName(), cons.get("assoc").accept(this));
                 }
                 case "empty": {
                     return new Nonterminal.Builder("empty").build();
                 }
                 // lit(str string)
                 case "lit": {
-                    String value = (String) o.get("string").accept(this);
+                    String value = (String) cons.get("string").accept(this);
                     RegularExpression regex = Seq.from(value);
                     return new Terminal.Builder(regex)
                         .setNodeType(TerminalNodeType.Regex)
@@ -272,28 +272,28 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // alt(set[Symbol] alternatives)
                 case "alt": {
-                   Set<Symbol> symbols = (Set<Symbol>) o.get("alternatives").accept(this);
+                   Set<Symbol> symbols = (Set<Symbol>) cons.get("alternatives").accept(this);
                    return Alt.from(new ArrayList<>(symbols));
                 }
                 // opt(Symbol symbol)
                 case "opt": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     return Opt.from(symbol);
                 }
                 // seq(list[Symbol] symbols)
                 case "seq": {
-                    List<Symbol> symbols = (List<Symbol>) o.get("symbols").accept(this);
+                    List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
                     return Group.from(symbols);
                 }
                 // iter(Symbol symbol)
                 case "iter": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     return Plus.from(symbol);
                 }
                 // iter-seps(Symbol symbol, list[Symbol] separators)
                 case "iter-seps": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
-                    List<Symbol> separators = (List<Symbol>) o.get("separators").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+                    List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
                     Plus.Builder plusBuilder = new Plus.Builder(symbol);
                     for (Symbol separator : separators) {
                         if (!layouts.contains(separator.getName())) {
@@ -304,13 +304,13 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // iter-star(Symbol symbol)
                 case "iter-star": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     return Star.from(symbol);
                 }
                 // iter-star-seps(Symbol symbol, list[Symbol] separators)
                 case "iter-star-seps": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
-                    List<Symbol> separators = (List<Symbol>) o.get("separators").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+                    List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
                     Star.Builder starBuilder = new Star.Builder(symbol);
                     for (Symbol separator : separators) {
                         if (!layouts.contains(separator.getName())) {
@@ -321,8 +321,8 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // associativity(Symbol def, Associativity assoc, set[Production] alternatives)
                 case "associativity": {
-                    Associativity associativity = (Associativity) o.get("assoc").accept(this);
-                    Set<Sequence> seqs = (Set<Sequence>) o.get("alternatives").accept(this);
+                    Associativity associativity = (Associativity) cons.get("assoc").accept(this);
+                    Set<Sequence> seqs = (Set<Sequence>) cons.get("alternatives").accept(this);
                     Alternative.Builder alternativeBuilder = new Alternative.Builder();
                     alternativeBuilder.addSequences(new ArrayList<>(seqs));
                     alternativeBuilder.setAssociativity(associativity);
@@ -342,31 +342,31 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // start(Symbol symbol)
                 case "start": {
-                    Nonterminal nonterminal = (Nonterminal) o.get("symbol").accept(this);
+                    Nonterminal nonterminal = (Nonterminal) cons.get("symbol").accept(this);
                     start = Start.from(nonterminal.getName());
                     return nonterminal;
                 }
                 // label(str name, Symbol symbol)
                 case "label": {
-                    String label = (String) o.get("name").accept(this);
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    String label = (String) cons.get("name").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     return symbol.copy().setLabel(label).build();
                 }
                 // range(int begin, int end)
                 case "range": {
-                    Integer start = (Integer) o.get("begin").accept(this);
-                    Integer end = (Integer) o.get("end").accept(this);
+                    Integer start = (Integer) cons.get("begin").accept(this);
+                    Integer end = (Integer) cons.get("end").accept(this);
                     return CharRange.in(start, end);
                 }
                 // char-class(list[CharRange] ranges)
                 case "char-class": {
-                    List<CharRange> ranges = (List<CharRange>) o.get("ranges").accept(this);
+                    List<CharRange> ranges = (List<CharRange>) cons.get("ranges").accept(this);
                     List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
                     return Alt.from(terminals);
                 }
                 // follow(Symbol symbol)
                 case "follow": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.follow(getRegex(symbol));
                     } else {
@@ -375,7 +375,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // not-follow(Symbol symbol)
                 case "not-follow": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.notFollow(getRegex(symbol));
                     } else {
@@ -384,7 +384,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // precede(Symbol symbol)
                 case "precede": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.precede(getRegex(symbol));
                     } else {
@@ -393,7 +393,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // not-precede(Symbol symbol)
                 case "not-precede": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.notPrecede(getRegex(symbol));
                     } else {
@@ -402,7 +402,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // delete(Symbol symbol)
                 case "delete": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.notMatch(getRegex(symbol));
                     } else {
@@ -423,13 +423,13 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // except(str label)
                 case "except": {
-                    String except = (String) o.get("label").accept(this);
+                    String except = (String) cons.get("label").accept(this);
                     return Identifier.fromName(except);
                 }
                 // conditional(Symbol symbol, set[Condition] conditions)
                 case "conditional": {
-                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
-                    Set<Object> conditions = (Set<Object>) o.get("conditions").accept(this);
+                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+                    Set<Object> conditions = (Set<Object>) cons.get("conditions").accept(this);
                     for (Object obj : conditions) {
                         SymbolBuilder<? extends Symbol> builder = symbol.copy();
                         if (obj instanceof Condition) {
@@ -457,7 +457,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // tag(value tag)
                 case "tag": {
-                    return o.get("tag").accept(this);
+                    return cons.get("tag").accept(this);
                 }
                 // bracket()
                 case "bracket": {
@@ -465,18 +465,18 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // parameter(str name, Symbol bound)
                 case "parameter": {
-                    String name = (String) o.get("name").accept(this);
-                    Symbol bound = (Symbol) o.get("bound").accept(this);
+                    String name = (String) cons.get("name").accept(this);
+                    Symbol bound = (Symbol) cons.get("bound").accept(this);
                     return Tuple.of(name, bound);
                 }
                 // adt(str name, list[Symbol] parameters)
                 case "adt": {
-                    String name = (String) o.get("name").accept(this);
-                    List<Symbol> parameters = (List<Symbol>) o.get("parameters").accept(this);
+                    String name = (String) cons.get("name").accept(this);
+                    List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
                     return Tuple.of(name, parameters);
                 }
                 default:
-                    throw new RuntimeException("Unknown constructor name: " + o.getName());
+                    throw new RuntimeException("Unknown constructor name: " + cons.getName());
             }
         }
 
