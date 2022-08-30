@@ -13,7 +13,6 @@ import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
 import org.iguana.regex.Seq;
 import org.iguana.util.Tuple;
-import org.rascalmpl.ast.Sym;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -71,18 +70,18 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         @Override
-        public String visitString(IString o) throws Throwable {
+        public String visitString(IString o) {
             return o.getValue();
         }
 
         @Override
-        public Object visitReal(IReal o) throws Throwable {
-            throw new RuntimeException();
+        public Object visitReal(IReal o) {
+            throw new UnsupportedOperationException();
         }
 
         @Override
-        public Object visitRational(IRational o) throws Throwable {
-            throw new RuntimeException();
+        public Object visitRational(IRational o) {
+            throw new UnsupportedOperationException();
         }
 
         @Override
@@ -107,12 +106,12 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitSourceLocation(ISourceLocation o) {
-            throw new RuntimeException(o.toString());
+            throw new UnsupportedOperationException();
         }
 
         @Override
         public Object visitTuple(ITuple o) {
-            throw new RuntimeException(o.toString());
+            throw new UnsupportedOperationException();
         }
 
         @Override
@@ -149,7 +148,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     } else if (child instanceof List<?>) {
                         addChildren((List<Object>) child, priorityLevels);
                     } else {
-                        throw new RuntimeException(">>>>>>>>: " + child.getClass());
+                        throw new RuntimeException("Unexpected type: " + child.getClass());
                     }
                 }
             }
@@ -157,64 +156,73 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         @Override
         public Object visitConstructor(IConstructor o) throws Throwable {
-            List<Object> visitedChildren = new ArrayList<>();
-            for (IValue child : o.getChildren()) {
-                visitedChildren.add(child.accept(this));
-            }
             switch (o.getName()) {
+                // choice(Symbol def, set[Production] alternatives)
                 case "choice": {
-                    Nonterminal head = (Nonterminal) visitedChildren.get(0);
+                    Nonterminal head = (Nonterminal) o.get("def").accept(this);
                     if (isLayout(o.get(0))) {
                         layouts.add(head.getName());
                     }
 
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
-                    Set<Object> children = (Set<Object>) visitedChildren.get(1);
-                    addChildren(children, priorityLevels);
+                    Set<Object> alternatives = (Set<Object>) o.get("alternatives").accept(this);
+                    addChildren(alternatives, priorityLevels);
                     return priorityLevels;
                 }
+                // prod(Symbol def, list[Symbol] symbols, set[Attr] attributes)
                 case "prod": {
                     Sequence.Builder sequenceBuilder = new Sequence.Builder();
 
-                    Symbol first = (Symbol) visitedChildren.get(0);
+                    Symbol first = (Symbol) o.get("def").accept(this);
                     if (first.getLabel() != null) {
                         sequenceBuilder.setLabel(first.getLabel());
                     }
 
-                    List<Symbol> symbols = (List<Symbol>) visitedChildren.get(1);
+                    List<Symbol> symbols = (List<Symbol>) o.get("symbols").accept(this);
                     for (Symbol symbol : symbols) {
                         if (!layouts.contains(symbol.getName()))
                             sequenceBuilder.addSymbol(symbol);
                     }
 
                     // attributes
-                    Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) visitedChildren.get(2);
+                    Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) o.get("attributes").accept(this);
                     for (Tuple<String, Object> attribute : attributes) {
                         sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
                     }
                     return sequenceBuilder.build();
                 }
+                // parameterized-sort(str name, list[Symbol] parameters)
                 case "parameterized-sort":
+                // sort(str name)
                 case "sort": {
-                    String nonterminalName = (String) visitedChildren.get(0);
-                    return new Nonterminal.Builder(nonterminalName).build();
+                    String nonterminalName = (String) o.get("name").accept(this);
+                    return Nonterminal.withName(nonterminalName);
                 }
-                case "keyword":
+                // keywords(str name)
+                case "keywords": {
+                    String keywords = (String) o.get("name").accept(this);
+                    return Identifier.fromName(keywords);
+                }
+                // parameterized-lex(str name, list[Symbol] parameters)
+                case "parametrized-lex":
+                // lex(str name)
                 case "lex": {
-                    String nonterminalName = (String) visitedChildren.get(0);
-                    return new Nonterminal.Builder(nonterminalName).build();
+                    String nonterminalName = (String) o.get("name").accept(this);
+                    return Nonterminal.withName(nonterminalName);
                 }
+                // layouts(str name)
                 case "layouts": {
-                    String nonterminalName = (String) visitedChildren.get(0);
-                    return new Nonterminal.Builder(nonterminalName).build();
+                    String nonterminalName = (String) o.get("name").accept(this);
+                    return Nonterminal.withName(nonterminalName);
                 }
+                // priority(Symbol def, list[Production] choices)
                 case "priority": {
                     List<PriorityLevel> priorityLevels = new ArrayList<>();
 
-                    List<Object> children = (List<Object>) visitedChildren.get(1);
+                    List<Object> choices = (List<Object>) o.get("choices").accept(this);
 
-                    for (Object child : children) {
+                    for (Object child : choices) {
                         if (child instanceof Sequence) {
                             PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
                             Alternative.Builder alternativeBuilder = new Alternative.Builder();
@@ -232,10 +240,11 @@ public class RascalGrammarToIguanaGrammarConverter {
                                 if (c instanceof PriorityLevel) {
                                     priorityLevels.add((PriorityLevel) c);
                                 } else {
-                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                                    List<Alternative> alternatives = (List<Alternative>) visitedChildren.get(1);
-                                    priorityLevelBuilder.addAlternatives(alternatives);
-                                    priorityLevels.add(priorityLevelBuilder.build());
+                                    throw new RuntimeException("Is it necessary here?");
+//                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+//                                    List<Alternative> alternatives = (List<Alternative>) choices;
+//                                    priorityLevelBuilder.addAlternatives(alternatives);
+//                                    priorityLevels.add(priorityLevelBuilder.build());
                                 }
                             }
                         }
@@ -243,18 +252,23 @@ public class RascalGrammarToIguanaGrammarConverter {
 
                     return priorityLevels;
                 }
+                // assoc(Associativity assoc)
                 case "assoc": {
-                    return Tuple.of(o.getName(), visitedChildren.get(0));
+                    return Tuple.of(o.getName(), o.get("assoc").accept(this));
                 }
                 case "empty": {
                     return new Nonterminal.Builder("empty").build();
                 }
+                // lit(str string)
                 case "lit": {
-                    String value = o.get(0).accept(this).toString();
+                    String value = (String) o.get("string").accept(this);
                     RegularExpression regex = Seq.from(value);
                     return new Terminal.Builder(regex)
                         .setNodeType(TerminalNodeType.Regex)
                         .build();
+                }
+                case "cilit": {
+                    throw new RuntimeException("Case-insensitive strings not supported yet");
                 }
                 // alt(set[Symbol] alternatives)
                 case "alt": {
@@ -305,93 +319,118 @@ public class RascalGrammarToIguanaGrammarConverter {
                     }
                     return starBuilder.build();
                 }
+                // associativity(Symbol def, Associativity assoc, set[Production] alternatives)
                 case "associativity": {
-                    Associativity associativity = (Associativity) visitedChildren.get(1);
-                    Set<Sequence> seqs = (Set<Sequence>) visitedChildren.get(2);
+                    Associativity associativity = (Associativity) o.get("assoc").accept(this);
+                    Set<Sequence> seqs = (Set<Sequence>) o.get("alternatives").accept(this);
                     Alternative.Builder alternativeBuilder = new Alternative.Builder();
                     alternativeBuilder.addSequences(new ArrayList<>(seqs));
                     alternativeBuilder.setAssociativity(associativity);
                     return alternativeBuilder.build();
                 }
+                // left()
                 case "left": {
                     return Associativity.LEFT;
                 }
+                // right()
                 case "right": {
                     return Associativity.RIGHT;
                 }
+                // non-assoc()
                 case "non-assoc": {
                     return Associativity.NON_ASSOC;
                 }
+                // start(Symbol symbol)
                 case "start": {
-                    Nonterminal nonterminal = (Nonterminal) visitedChildren.get(0);
+                    Nonterminal nonterminal = (Nonterminal) o.get("symbol").accept(this);
                     start = Start.from(nonterminal.getName());
                     return nonterminal;
                 }
+                // label(str name, Symbol symbol)
                 case "label": {
-                    String label = (String) visitedChildren.get(0);
-                    Symbol symbol = (Symbol) visitedChildren.get(1);
+                    String label = (String) o.get("name").accept(this);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
                     return symbol.copy().setLabel(label).build();
                 }
+                // range(int begin, int end)
                 case "range": {
-                    Integer start = (Integer) visitedChildren.get(0);
-                    Integer end = (Integer) visitedChildren.get(1);
+                    Integer start = (Integer) o.get("begin").accept(this);
+                    Integer end = (Integer) o.get("end").accept(this);
                     return CharRange.in(start, end);
                 }
+                // char-class(list[CharRange] ranges)
                 case "char-class": {
-                    List<CharRange> ranges = (List<CharRange>) visitedChildren.get(0);
+                    List<CharRange> ranges = (List<CharRange>) o.get("ranges").accept(this);
                     List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
                     return Alt.from(terminals);
                 }
+                // follow(Symbol symbol)
                 case "follow": {
-                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.follow(getRegex(symbol));
                     } else {
                         throw new RuntimeException("Must only be a regular expression: " + symbol);
                     }
                 }
+                // not-follow(Symbol symbol)
                 case "not-follow": {
-                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.notFollow(getRegex(symbol));
                     } else {
                         throw new RuntimeException("Must only be a regular expression: " + symbol);
                     }
                 }
-                case "not-precede": {
-                    Symbol symbol = (Symbol) visitedChildren.get(0);
-                    if (isRegex(symbol)) {
-                        return RegularExpressionCondition.notPrecede(getRegex(symbol));
-                    } else {
-                        throw new RuntimeException("Must only be a regular expression: " + symbol);
-                    }
-                }
+                // precede(Symbol symbol)
                 case "precede": {
-                    Symbol symbol = (Symbol) visitedChildren.get(0);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
                     if (isRegex(symbol)) {
                         return RegularExpressionCondition.precede(getRegex(symbol));
                     } else {
                         throw new RuntimeException("Must only be a regular expression: " + symbol);
                     }
                 }
-                case "except": {
-                    String except = (String) visitedChildren.get(0);
-                    return Identifier.fromName(except);
+                // not-precede(Symbol symbol)
+                case "not-precede": {
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    if (isRegex(symbol)) {
+                        return RegularExpressionCondition.notPrecede(getRegex(symbol));
+                    } else {
+                        throw new RuntimeException("Must only be a regular expression: " + symbol);
+                    }
                 }
-                case "keywords": {
-                    String keywords = (String) visitedChildren.get(0);
-                    return Identifier.fromName(keywords);
+                // delete(Symbol symbol)
+                case "delete": {
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    if (isRegex(symbol)) {
+                        return RegularExpressionCondition.notMatch(getRegex(symbol));
+                    } else {
+                        throw new RuntimeException("Must only be a regular expression: " + symbol);
+                    }
                 }
+                // at-column(int column)
+                case "at-column": {
+                    throw new RuntimeException("at-column conditional is not supported yet");
+                }
+                // end-of-line()
                 case "end-of-line": {
                     return new PositionalCondition(ConditionType.END_OF_LINE);
                 }
+                // begin-of-line()
                 case "begin-of-line": {
                     return new PositionalCondition(ConditionType.START_OF_LINE);
                 }
+                // except(str label)
+                case "except": {
+                    String except = (String) o.get("label").accept(this);
+                    return Identifier.fromName(except);
+                }
+                // conditional(Symbol symbol, set[Condition] conditions)
                 case "conditional": {
-                    Set<Object> conditions = (Set<Object>) visitedChildren.get(1);
+                    Symbol symbol = (Symbol) o.get("symbol").accept(this);
+                    Set<Object> conditions = (Set<Object>) o.get("conditions").accept(this);
                     for (Object obj : conditions) {
-                        Symbol symbol = (Symbol) visitedChildren.get(0);
                         SymbolBuilder<? extends Symbol> builder = symbol.copy();
                         if (obj instanceof Condition) {
                             Condition condition = (Condition) obj;
@@ -410,17 +449,31 @@ public class RascalGrammarToIguanaGrammarConverter {
                             return builder.build();
                         } else {
                             assert obj instanceof Identifier;
-                            assert visitedChildren.get(0) instanceof Nonterminal;
-                            Nonterminal nonterminal = (Nonterminal) visitedChildren.get(0);
+                            assert symbol instanceof Nonterminal;
+                            Nonterminal nonterminal = (Nonterminal) symbol;
                             return nonterminal.copy().addExcept(((Identifier) obj).getName()).build();
                         }
                     }
                 }
+                // tag(value tag)
                 case "tag": {
-                    return visitedChildren.get(0);
+                    return o.get("tag").accept(this);
                 }
+                // bracket()
                 case "bracket": {
                     return Tuple.of("bracket", null);
+                }
+                // parameter(str name, Symbol bound)
+                case "parameter": {
+                    String name = (String) o.get("name").accept(this);
+                    Symbol bound = (Symbol) o.get("bound").accept(this);
+                    return Tuple.of(name, bound);
+                }
+                // adt(str name, list[Symbol] parameters)
+                case "adt": {
+                    String name = (String) o.get("name").accept(this);
+                    List<Symbol> parameters = (List<Symbol>) o.get("parameters").accept(this);
+                    return Tuple.of(name, parameters);
                 }
                 default:
                     throw new RuntimeException("Unknown constructor name: " + o.getName());
