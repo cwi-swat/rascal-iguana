@@ -3,7 +3,8 @@ module util::Iguana
 extend ParseTree;
 import IO;
 
-import lang::rascal::\syntax::Rascal;
+// import lang::rascal::\syntax::Rascal;
+import demo::lang::Pico::Syntax;
 
 alias Parser[&T] = &T (str input, loc origin);
 
@@ -11,7 +12,7 @@ alias Parser[&T] = &T (str input, loc origin);
 java Parser[&T] createParser(type[&T] grammar);
 
 void main() {
-    Parser[Module] p = createParser(#Module);
+    Parser[Program] p = createParser(#Program);
 
     try {
      println(p("a"));
