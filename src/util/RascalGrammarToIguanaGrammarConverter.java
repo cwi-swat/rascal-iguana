@@ -24,14 +24,12 @@ public class RascalGrammarToIguanaGrammarConverter {
         IMap definitions = (IMap) grammar.get("definitions");
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
-        Set<String> layouts = new HashSet<>();
-        ValueVisitor visitor = new ValueVisitor(layouts);
+        String layout = getLayoutDefinition(definitions);
+        ValueVisitor visitor = new ValueVisitor(layout);
 
         while (entryIterator.hasNext()) {
             Map.Entry<IValue, IValue> next = entryIterator.next();
-            IValue key = next.getKey();
             IValue value = next.getValue();
-            System.out.println(key + " = " + value + " " + value.getType() + " " + value.getType().getName());
 
             try {
                 Rule rule = (Rule) value.accept(visitor);
@@ -46,13 +44,33 @@ public class RascalGrammarToIguanaGrammarConverter {
             .build();
     }
 
+    // We need to first get the layout definition and then skip them when creating the Iguana grammar rules.
+    // Iguana handles layout in a later stage.
+    private static String getLayoutDefinition(IMap definitions) {
+        Iterator<IValue> it = definitions.iterator();
+        String layout = null;
+        while (it.hasNext()) {
+            IValue next = it.next();
+            if (isLayout(next)) {
+                layout = ((IString) ((IConstructor) next).get(0)).getValue();
+            }
+        }
+        assert layout != null;
+        return layout;
+    }
+
+    private static boolean isLayout(IValue value) {
+        if (!(value instanceof IConstructor)) return false;
+        return ((IConstructor) value).getName().equals("layouts");
+    }
+
     static class ValueVisitor implements IValueVisitor<Object, Throwable> {
 
-        private final Set<String> layouts;
+        private final String layout;
         private Start start;
 
-        public ValueVisitor(Set<String> layouts) {
-            this.layouts = layouts;
+        public ValueVisitor(String layout) {
+            this.layout = layout;
         }
 
         @Override
@@ -85,7 +103,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             Set<Object> set = new HashSet<>();
             for (IValue elem : o) {
                 Object res = elem.accept(this);
-                if (res != null) set.add(res);
+                set.add(res);
             }
             return set;
         }
@@ -109,38 +127,36 @@ public class RascalGrammarToIguanaGrammarConverter {
             return Tuple.of(o.getName(), value);
         }
 
-        private static boolean isLayout(IValue value) {
-            if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("layouts");
-        }
-
         private static boolean isLexical(IValue value) {
             if (!(value instanceof IConstructor)) return false;
             return ((IConstructor) value).getName().equals("lex");
         }
 
-        private void addChildren(Collection<Object> children, List<PriorityLevel> priorityLevels) {
-            boolean allPriorityLevels = children.stream().allMatch(child -> child instanceof PriorityLevel);
-            if (allPriorityLevels) {
-                for (Object child : children) {
-                    priorityLevels.add((PriorityLevel) child);
-                }
-            } else {
-                for (Object child : children) {
-                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                    if (child instanceof Alternative) {
-                        priorityLevelBuilder.addAlternative((Alternative) child);
-                        priorityLevels.add(priorityLevelBuilder.build());
-                    } else if (child instanceof Sequence) {
-                        Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                        alternativeBuilder.addSequence((Sequence) child);
-                        priorityLevelBuilder.addAlternative(alternativeBuilder.build());
-                        priorityLevels.add(priorityLevelBuilder.build());
-                    } else if (child instanceof List<?>) {
-                        addChildren((List<Object>) child, priorityLevels);
+        private void addChildren(Collection<Object> children, List<PriorityLevel> levels) {
+            List<Object> alternativesOrSequences = children.stream().filter(c -> c instanceof Alternative || c instanceof Sequence).collect(Collectors.toList());
+            List<Object> priorityLevels = children.stream().filter(c -> c instanceof PriorityLevel).collect(Collectors.toList());
+            List<Object> lists = children.stream().filter(c -> c instanceof List<?>).collect(Collectors.toList());
+
+            for (Object priorityLevel : priorityLevels) {
+                levels.add((PriorityLevel) priorityLevel);
+            }
+            if (!alternativesOrSequences.isEmpty()) {
+                PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                for (Object obj : alternativesOrSequences) {
+                    if (obj instanceof Alternative) {
+                        priorityLevelBuilder.addAlternative((Alternative) obj);
                     } else {
-                        throw new RuntimeException("Unexpected type: " + child.getClass());
+                        Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                        alternativeBuilder.addSequence((Sequence) obj);
+                        priorityLevelBuilder.addAlternative(alternativeBuilder.build());
                     }
+                }
+                levels.add(priorityLevelBuilder.build());
+            }
+
+            if (!lists.isEmpty()) {
+                for (Object o : lists) {
+                    addChildren((Collection<Object>) o, levels);
                 }
             }
         }
@@ -151,14 +167,11 @@ public class RascalGrammarToIguanaGrammarConverter {
                 // choice(Symbol def, set[Production] alternatives)
                 case "choice": {
                     Symbol head = (Symbol) cons.get("def").accept(this);
-                    if (isLayout(cons.get(0))) {
-                        layouts.add(head.getName());
-                    }
-
                     Rule.Builder ruleBuilder = new Rule.Builder(Nonterminal.withName(head.getName()));
-                    List<PriorityLevel> priorityLevels = new ArrayList<>();
 
                     Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
+
+                    List<PriorityLevel> priorityLevels = new ArrayList<>();
                     addChildren(alternatives, priorityLevels);
 
                     ruleBuilder.addPriorityLevels(priorityLevels);
@@ -182,7 +195,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
                     List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
                     for (Symbol symbol : symbols) {
-                        if (!layouts.contains(symbol.getName()))
+                        if (!layout.equals(symbol.getName()))
                             sequenceBuilder.addSymbol(symbol);
                     }
 
@@ -194,7 +207,9 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return sequenceBuilder.build();
                 }
                 // parameterized-sort(str name, list[Symbol] parameters)
-                case "parameterized-sort":
+                case "parameterized-sort": {
+                    throw new RuntimeException("Parametrized sort is not supported yet.");
+                }
                 // sort(str name)
                 case "sort": {
                     String nonterminalName = (String) cons.get("name").accept(this);
@@ -206,7 +221,9 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return Identifier.fromName(keywords);
                 }
                 // parameterized-lex(str name, list[Symbol] parameters)
-                case "parametrized-lex":
+                case "parameterized-lex": {
+                    throw new RuntimeException("Parametrized lex is not supported yet.");
+                }
                 // lex(str name)
                 case "lex": {
                     String nonterminalName = (String) cons.get("name").accept(this);
@@ -236,18 +253,8 @@ public class RascalGrammarToIguanaGrammarConverter {
                             priorityLevels.add(priorityLevelBuilder.build());
                         } else if (child instanceof PriorityLevel) {
                             priorityLevels.add((PriorityLevel) child);
-                        } else if (child instanceof List<?>) {
-                            for (Object c : (List<?>) child) {
-                                if (c instanceof PriorityLevel) {
-                                    priorityLevels.add((PriorityLevel) c);
-                                } else {
-                                    throw new RuntimeException("Is it necessary here?");
-//                                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-//                                    List<Alternative> alternatives = (List<Alternative>) choices;
-//                                    priorityLevelBuilder.addAlternatives(alternatives);
-//                                    priorityLevels.add(priorityLevelBuilder.build());
-                                }
-                            }
+                        } else if (child instanceof Rule) {
+                            priorityLevels.addAll(((Rule) child).getPriorityLevels());
                         }
                     }
 
@@ -258,7 +265,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     return Tuple.of(cons.getName(), cons.get("assoc").accept(this));
                 }
                 case "empty": {
-                    return new Terminal.Builder(Terminal.epsilon()).setName("empty");
+                    return new Terminal.Builder(Terminal.epsilon()).setName("empty").build();
                 }
                 // lit(str string)
                 case "lit": {
@@ -297,7 +304,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
                     Plus.Builder plusBuilder = new Plus.Builder(symbol);
                     for (Symbol separator : separators) {
-                        if (!layouts.contains(separator.getName())) {
+                        if (!layout.equals(separator.getName())) {
                             plusBuilder.addSeparator(separator);
                         }
                     }
@@ -314,7 +321,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
                     Star.Builder starBuilder = new Star.Builder(symbol);
                     for (Symbol separator : separators) {
-                        if (!layouts.contains(separator.getName())) {
+                        if (!layout.equals(separator.getName())) {
                             starBuilder.addSeparator(separator);
                         }
                     }
@@ -466,9 +473,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 }
                 // parameter(str name, Symbol bound)
                 case "parameter": {
-                    String name = (String) cons.get("name").accept(this);
-                    Symbol bound = (Symbol) cons.get("bound").accept(this);
-                    return Tuple.of(name, bound);
+                    throw new RuntimeException("Parameter is not supported yet");
                 }
                 // adt(str name, list[Symbol] parameters)
                 case "adt": {
