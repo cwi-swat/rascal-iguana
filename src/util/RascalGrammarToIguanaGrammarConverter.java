@@ -52,10 +52,13 @@ public class RascalGrammarToIguanaGrammarConverter {
         while (it.hasNext()) {
             IValue next = it.next();
             if (isLayout(next)) {
-                layout = ((IString) ((IConstructor) next).get(0)).getValue();
+                String value = ((IString) ((IConstructor) next).get(0)).getValue();
+                // Skip the default layout definition.
+                if (!value.equals("$default$")) {
+                    layout = value;
+                }
             }
         }
-        assert layout != null;
         return layout;
     }
 
@@ -195,8 +198,9 @@ public class RascalGrammarToIguanaGrammarConverter {
 
                     List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
                     for (Symbol symbol : symbols) {
-                        if (!layout.equals(symbol.getName()))
+                        if (!isLayout(symbol.getName())) {
                             sequenceBuilder.addSymbol(symbol);
+                        }
                     }
 
                     // attributes
@@ -304,7 +308,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
                     Plus.Builder plusBuilder = new Plus.Builder(symbol);
                     for (Symbol separator : separators) {
-                        if (!layout.equals(separator.getName())) {
+                        if (!isLayout(separator.getName())) {
                             plusBuilder.addSeparator(separator);
                         }
                     }
@@ -321,7 +325,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
                     Star.Builder starBuilder = new Star.Builder(symbol);
                     for (Symbol separator : separators) {
-                        if (!layout.equals(separator.getName())) {
+                        if (!isLayout(separator.getName())) {
                             starBuilder.addSeparator(separator);
                         }
                     }
@@ -509,6 +513,10 @@ public class RascalGrammarToIguanaGrammarConverter {
         @Override
         public Object visitDateTime(IDateTime o) {
             throw new RuntimeException(o.toString());
+        }
+
+        private boolean isLayout(String name) {
+            return layout != null && layout.equals(name);
         }
 
         private static boolean isRegex(Symbol symbol) {
