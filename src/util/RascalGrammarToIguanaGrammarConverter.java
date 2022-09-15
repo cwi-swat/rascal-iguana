@@ -181,334 +181,49 @@ public class RascalGrammarToIguanaGrammarConverter {
         @Override
         public Object visitConstructor(IConstructor cons) throws Throwable {
             switch (cons.getName()) {
-                // choice(Symbol def, set[Production] alternatives)
-                case "choice": {
-                    IValue headDef = cons.get("def");
-
-                    Symbol head = (Symbol) headDef.accept(this);
-                    Rule.Builder ruleBuilder = new Rule.Builder(Nonterminal.withName(head.getName()));
-
-                    Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
-
-                    List<PriorityLevel> priorityLevels = new ArrayList<>();
-                    addChildren(alternatives, priorityLevels);
-
-                    ruleBuilder.addPriorityLevels(priorityLevels);
-
-                    LayoutStrategy layoutStrategy;
-                    // Do not insert layout for the lexical or layout definitions
-                    if (isLexical(headDef) || isLayout(headDef)) {
-                        layoutStrategy = LayoutStrategy.NO_LAYOUT;
-                    } else {
-                        layoutStrategy = LayoutStrategy.INHERITED;
-                    }
-
-                    ruleBuilder.setLayoutStrategy(layoutStrategy);
-
-                    if (isStart(headDef)) return null;
-
-                    return ruleBuilder.build();
-                }
-                // prod(Symbol def, list[Symbol] symbols, set[Attr] attributes)
-                case "prod": {
-                    Sequence.Builder sequenceBuilder = new Sequence.Builder();
-
-                    Symbol first = (Symbol) cons.get("def").accept(this);
-                    if (first.getLabel() != null) {
-                        sequenceBuilder.setLabel(first.getLabel());
-                    }
-
-                    List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
-                    for (Symbol symbol : symbols) {
-                        if (!isLayout(symbol.getName())) {
-                            sequenceBuilder.addSymbol(symbol);
-                        }
-                    }
-
-                    // attributes
-                    Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) cons.get("attributes").accept(this);
-                    for (Tuple<String, Object> attribute : attributes) {
-                        sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
-                    }
-                    return sequenceBuilder.build();
-                }
-                // parameterized-sort(str name, list[Symbol] parameters)
-                case "parameterized-sort": {
-                    throw new RuntimeException("Parametrized sort is not supported yet.");
-                }
-                // sort(str name)
-                case "sort": {
-                    String nonterminalName = (String) cons.get("name").accept(this);
-                    return Nonterminal.withName(nonterminalName);
-                }
-                // keywords(str name)
-                case "keywords": {
-                    String keywords = (String) cons.get("name").accept(this);
-                    return Identifier.fromName(keywords);
-                }
-                // parameterized-lex(str name, list[Symbol] parameters)
-                case "parameterized-lex": {
-                    throw new RuntimeException("Parametrized lex is not supported yet.");
-                }
-                // lex(str name)
-                case "lex": {
-                    String nonterminalName = (String) cons.get("name").accept(this);
-                    return Nonterminal.withName(nonterminalName);
-                }
-                // layouts(str name)
-                case "layouts": {
-                    String nonterminalName = (String) cons.get("name").accept(this);
-                    return Nonterminal.withName(nonterminalName);
-                }
-                // priority(Symbol def, list[Production] choices)
-                case "priority": {
-                    List<PriorityLevel> priorityLevels = new ArrayList<>();
-
-                    List<Object> choices = (List<Object>) cons.get("choices").accept(this);
-
-                    for (Object child : choices) {
-                        if (child instanceof Sequence) {
-                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                            Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                            alternativeBuilder.addSequence((Sequence) child);
-                            priorityLevelBuilder.addAlternative(alternativeBuilder.build());
-                            priorityLevels.add(priorityLevelBuilder.build());
-                        } else if (child instanceof Alternative) {
-                            PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
-                            priorityLevelBuilder.addAlternative((Alternative) child);
-                            priorityLevels.add(priorityLevelBuilder.build());
-                        } else if (child instanceof PriorityLevel) {
-                            priorityLevels.add((PriorityLevel) child);
-                        } else if (child instanceof Rule) {
-                            priorityLevels.addAll(((Rule) child).getPriorityLevels());
-                        }
-                    }
-
-                    return priorityLevels;
-                }
-                // assoc(Associativity assoc)
-                case "assoc": {
-                    return Tuple.of(cons.getName(), cons.get("assoc").accept(this));
-                }
-                case "empty": {
-                    return new Terminal.Builder(Terminal.epsilon()).setName("empty").build();
-                }
-                // lit(str string)
-                case "lit": {
-                    String value = (String) cons.get("string").accept(this);
-                    RegularExpression regex = Seq.from(value);
-                    return new Terminal.Builder(regex)
-                        .setNodeType(TerminalNodeType.Regex)
-                        .build();
-                }
-                case "cilit": {
-                    throw new RuntimeException("Case-insensitive strings not supported yet");
-                }
-                // alt(set[Symbol] alternatives)
-                case "alt": {
-                   Set<Symbol> symbols = (Set<Symbol>) cons.get("alternatives").accept(this);
-                   return Alt.from(new ArrayList<>(symbols));
-                }
-                // opt(Symbol symbol)
-                case "opt": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    return Opt.from(symbol);
-                }
-                // seq(list[Symbol] symbols)
-                case "seq": {
-                    List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
-                    return Group.from(symbols);
-                }
-                // iter(Symbol symbol)
-                case "iter": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    return Plus.from(symbol);
-                }
-                // iter-seps(Symbol symbol, list[Symbol] separators)
-                case "iter-seps": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
-                    Plus.Builder plusBuilder = new Plus.Builder(symbol);
-                    for (Symbol separator : separators) {
-                        if (!isLayout(separator.getName())) {
-                            plusBuilder.addSeparator(separator);
-                        }
-                    }
-                    return plusBuilder.build();
-                }
-                // iter-star(Symbol symbol)
-                case "iter-star": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    return Star.from(symbol);
-                }
-                // iter-star-seps(Symbol symbol, list[Symbol] separators)
-                case "iter-star-seps": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
-                    Star.Builder starBuilder = new Star.Builder(symbol);
-                    for (Symbol separator : separators) {
-                        if (!isLayout(separator.getName())) {
-                            starBuilder.addSeparator(separator);
-                        }
-                    }
-                    return starBuilder.build();
-                }
-                // associativity(Symbol def, Associativity assoc, set[Production] alternatives)
-                case "associativity": {
-                    Associativity associativity = (Associativity) cons.get("assoc").accept(this);
-                    Set<Sequence> seqs = (Set<Sequence>) cons.get("alternatives").accept(this);
-                    Alternative.Builder alternativeBuilder = new Alternative.Builder();
-                    alternativeBuilder.addSequences(new ArrayList<>(seqs));
-                    alternativeBuilder.setAssociativity(associativity);
-                    return alternativeBuilder.build();
-                }
-                // left()
-                case "left": {
-                    return Associativity.LEFT;
-                }
-                // right()
-                case "right": {
-                    return Associativity.RIGHT;
-                }
-                // non-assoc()
-                case "non-assoc": {
-                    return Associativity.NON_ASSOC;
-                }
-                // start(Symbol symbol)
-                case "start": {
-                    Nonterminal nonterminal = (Nonterminal) cons.get("symbol").accept(this);
-                    start = Start.from(nonterminal.getName());
-                    return nonterminal;
-                }
-                // label(str name, Symbol symbol)
-                case "label": {
-                    String label = (String) cons.get("name").accept(this);
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    return symbol.copy().setLabel(label).build();
-                }
-                // range(int begin, int end)
-                case "range": {
-                    Integer start = (Integer) cons.get("begin").accept(this);
-                    Integer end = (Integer) cons.get("end").accept(this);
-                    return CharRange.in(start, end);
-                }
-                // char-class(list[CharRange] ranges)
-                case "char-class": {
-                    List<CharRange> ranges = (List<CharRange>) cons.get("ranges").accept(this);
-                    List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
-                    return Alt.from(terminals);
-                }
-                // follow(Symbol symbol)
-                case "follow": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    if (isRegex(symbol)) {
-                        return RegularExpressionCondition.follow(getRegex(symbol));
-                    } else {
-                        throw new RuntimeException("Must only be a regular expression: " + symbol);
-                    }
-                }
-                // not-follow(Symbol symbol)
-                case "not-follow": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    if (isRegex(symbol)) {
-                        return RegularExpressionCondition.notFollow(getRegex(symbol));
-                    } else {
-                        throw new RuntimeException("Must only be a regular expression: " + symbol);
-                    }
-                }
-                // precede(Symbol symbol)
-                case "precede": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    if (isRegex(symbol)) {
-                        return RegularExpressionCondition.precede(getRegex(symbol));
-                    } else {
-                        throw new RuntimeException("Must only be a regular expression: " + symbol);
-                    }
-                }
-                // not-precede(Symbol symbol)
-                case "not-precede": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    if (isRegex(symbol)) {
-                        return RegularExpressionCondition.notPrecede(getRegex(symbol));
-                    } else {
-                        throw new RuntimeException("Must only be a regular expression: " + symbol);
-                    }
-                }
-                // delete(Symbol symbol)
-                case "delete": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    if (isRegex(symbol)) {
-                        return RegularExpressionCondition.notMatch(getRegex(symbol));
-                    } else {
-                        throw new RuntimeException("Must only be a regular expression: " + symbol);
-                    }
-                }
-                // at-column(int column)
-                case "at-column": {
-                    throw new RuntimeException("at-column conditional is not supported yet");
-                }
-                // end-of-line()
-                case "end-of-line": {
-                    return new PositionalCondition(ConditionType.END_OF_LINE);
-                }
-                // begin-of-line()
-                case "begin-of-line": {
-                    return new PositionalCondition(ConditionType.START_OF_LINE);
-                }
-                // except(str label)
-                case "except": {
-                    String except = (String) cons.get("label").accept(this);
-                    return Identifier.fromName(except);
-                }
-                // conditional(Symbol symbol, set[Condition] conditions)
-                case "conditional": {
-                    Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-                    Set<Object> conditions = (Set<Object>) cons.get("conditions").accept(this);
-                    for (Object obj : conditions) {
-                        SymbolBuilder<? extends Symbol> builder = symbol.copy();
-                        if (obj instanceof Condition) {
-                            Condition condition = (Condition) obj;
-                            switch (condition.getType()) {
-                                case FOLLOW:
-                                case NOT_FOLLOW:
-                                case END_OF_FILE:
-                                    builder.addPostCondition(condition);
-                                    break;
-                                case START_OF_LINE:
-                                case PRECEDE:
-                                case NOT_PRECEDE:
-                                    builder.addPreCondition(condition);
-                                    break;
-                            }
-                            return builder.build();
-                        } else {
-                            assert obj instanceof Identifier;
-                            assert symbol instanceof Nonterminal;
-                            Nonterminal nonterminal = (Nonterminal) symbol;
-                            return nonterminal.copy().addExcept(((Identifier) obj).getName()).build();
-                        }
-                    }
-                }
-                // tag(value tag)
-                case "tag": {
-                    return cons.get("tag").accept(this);
-                }
-                // bracket()
-                case "bracket": {
-                    return Tuple.of("bracket", null);
-                }
-                // parameter(str name, Symbol bound)
-                case "parameter": {
-                    throw new RuntimeException("Parameter is not supported yet");
-                }
-                // adt(str name, list[Symbol] parameters)
-                case "adt": {
-                    String name = (String) cons.get("name").accept(this);
-                    List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
-                    return Tuple.of(name, parameters);
-                }
-                default:
-                    throw new RuntimeException("Unknown constructor name: " + cons.getName());
+                case "choice": return convertChoice(cons);
+                case "prod": return convertProd(cons);
+                case "parameterized-sort": return convertParametrizedSort(cons);
+                case "sort": return convertSort(cons);
+                case "keywords": return convertKeywords(cons);
+                case "parameterized-lex": convertParametrizedLex(cons);
+                case "lex": return convertSort(cons);
+                case "layouts": return convertSort(cons);
+                case "priority": return convertPriority(cons);
+                case "assoc": return convertAssoc(cons);
+                case "empty": return convertEmpty(cons);
+                case "lit": return convertLit(cons);
+                case "cilit": convertCilit(cons);
+                case "alt": return convertAlt(cons);
+                case "opt": return convertOpt(cons);
+                case "seq": return convertSeq(cons);
+                case "iter": return convertIter(cons);
+                case "iter-seps": return convertIterSeps(cons);
+                case "iter-star": return convertIterStar(cons);
+                case "iter-star-seps": return convertIterStarSeps(cons);
+                case "associativity": return convertAssociativity(cons);
+                case "left": return convertLeft(cons);
+                case "right": return convertRight(cons);
+                case "non-assoc": return convertNonAssoc(cons);
+                case "start": return convertStart(cons);
+                case "label": return convertLabel(cons);
+                case "range": return convertRange(cons);
+                case "char-class": return convertCharClass(cons);
+                case "follow": return convertFollow(cons);
+                case "not-follow": return convertNotFollow(cons);
+                case "precede": return convertPrecede(cons);
+                case "not-precede": return convertNotPrecede(cons);
+                case "delete": return convertDelete(cons);
+                case "at-column": convertAtColumn(cons);
+                case "end-of-line": return convertEndOfLine(cons);
+                case "begin-of-line": return convertBeginOfLine(cons);
+                case "except": return convertExcept(cons);
+                case "conditional": return convertConditional(cons);
+                case "tag": return convertTag(cons);
+                case "bracket": return convertBracket(cons);
+                case "parameter": convertParameter(cons);
+                case "adt": return convertADT(cons);
+                default: throw new RuntimeException("Unknown constructor name: " + cons.getName());
             }
         }
 
@@ -535,6 +250,364 @@ public class RascalGrammarToIguanaGrammarConverter {
         @Override
         public Object visitDateTime(IDateTime o) {
             throw new RuntimeException(o.toString());
+        }
+
+        // adt(str name, list[Symbol] parameters)
+        private Tuple<String, List<Symbol>> convertADT(IConstructor cons) throws Throwable {
+            String name = (String) cons.get("name").accept(this);
+            List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
+            return Tuple.of(name, parameters);
+        }
+
+        // parameter(str name, Symbol bound)
+        private void convertParameter(IConstructor cons) {
+            throw new RuntimeException("Parameter is not supported yet");
+        }
+
+        // bracket()
+        private static Tuple<String, Object> convertBracket(IConstructor cons) {
+            return Tuple.of("bracket", null);
+        }
+
+        // tag(value tag)
+        private Object convertTag(IConstructor cons) throws Throwable {
+            return cons.get("tag").accept(this);
+        }
+
+        // conditional(Symbol symbol, set[Condition] conditions)
+        private Symbol convertConditional(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            Set<Object> conditions = (Set<Object>) cons.get("conditions").accept(this);
+            SymbolBuilder<? extends Symbol> builder = symbol.copy();
+            for (Object obj : conditions) {
+                if (obj instanceof Condition) {
+                    Condition condition = (Condition) obj;
+                    switch (condition.getType()) {
+                        case FOLLOW:
+                        case NOT_FOLLOW:
+                        case END_OF_FILE:
+                            builder.addPostCondition(condition);
+                            break;
+                        case START_OF_LINE:
+                        case PRECEDE:
+                        case NOT_PRECEDE:
+                            builder.addPreCondition(condition);
+                            break;
+                    }
+                } else {
+                    assert obj instanceof Identifier;
+                    assert symbol instanceof Nonterminal;
+                    ((Nonterminal.Builder) builder).addExcept(((Identifier) obj).getName());
+                }
+            }
+            return builder.build();
+        }
+
+        // except(str label)
+        private Identifier convertExcept(IConstructor cons) throws Throwable {
+            String except = (String) cons.get("label").accept(this);
+            return Identifier.fromName(except);
+        }
+
+        // begin-of-line()
+        private static PositionalCondition convertBeginOfLine(IConstructor cons) {
+            return new PositionalCondition(ConditionType.START_OF_LINE);
+        }
+
+        // end-of-line()
+        private PositionalCondition convertEndOfLine(IConstructor cons) {
+            return new PositionalCondition(ConditionType.END_OF_LINE);
+        }
+
+        // at-column(int column)
+        private static void convertAtColumn(IConstructor cons) {
+            throw new RuntimeException("at-column conditional is not supported yet");
+        }
+
+        // delete(Symbol symbol)
+        private RegularExpressionCondition convertDelete(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            if (isRegex(symbol)) {
+                return RegularExpressionCondition.notMatch(getRegex(symbol));
+            } else {
+                throw new RuntimeException("Must only be a regular expression: " + symbol);
+            }
+        }
+
+        // not-precede(Symbol symbol)
+        private RegularExpressionCondition convertNotPrecede(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            if (isRegex(symbol)) {
+                return RegularExpressionCondition.notPrecede(getRegex(symbol));
+            } else {
+                throw new RuntimeException("Must only be a regular expression: " + symbol);
+            }
+        }
+
+        // precede(Symbol symbol)
+        private RegularExpressionCondition convertPrecede(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            if (isRegex(symbol)) {
+                return RegularExpressionCondition.precede(getRegex(symbol));
+            } else {
+                throw new RuntimeException("Must only be a regular expression: " + symbol);
+            }
+        }
+
+        // not-follow(Symbol symbol)
+        private RegularExpressionCondition convertNotFollow(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            if (isRegex(symbol)) {
+                return RegularExpressionCondition.notFollow(getRegex(symbol));
+            } else {
+                throw new RuntimeException("Must only be a regular expression: " + symbol);
+            }
+        }
+
+        // follow(Symbol symbol)
+        private RegularExpressionCondition convertFollow(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            if (isRegex(symbol)) {
+                return RegularExpressionCondition.follow(getRegex(symbol));
+            } else {
+                throw new RuntimeException("Must only be a regular expression: " + symbol);
+            }
+        }
+
+        // char-class(list[CharRange] ranges)
+        private Alt convertCharClass(IConstructor cons) throws Throwable {
+            List<CharRange> ranges = (List<CharRange>) cons.get("ranges").accept(this);
+            List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
+            return Alt.from(terminals);
+        }
+
+        // range(int begin, int end)
+        private CharRange convertRange(IConstructor cons) throws Throwable {
+            Integer start = (Integer) cons.get("begin").accept(this);
+            Integer end = (Integer) cons.get("end").accept(this);
+            return CharRange.in(start, end);
+        }
+
+        // label(str name, Symbol symbol)
+        private Symbol convertLabel(IConstructor cons) throws Throwable {
+            String label = (String) cons.get("name").accept(this);
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            return symbol.copy().setLabel(label).build();
+        }
+
+        // // start(Symbol symbol)
+        private Nonterminal convertStart(IConstructor cons) throws Throwable {
+            Nonterminal nonterminal = (Nonterminal) cons.get("symbol").accept(this);
+            start = Start.from(nonterminal.getName());
+            return nonterminal;
+        }
+
+        // non-assoc()
+        private Associativity convertNonAssoc(IConstructor cons) {
+            return Associativity.NON_ASSOC;
+        }
+
+        // right()
+        private Associativity convertRight(IConstructor cons) {
+            return Associativity.RIGHT;
+        }
+
+        // left()
+        private Associativity convertLeft(IConstructor cons) {
+            return Associativity.LEFT;
+        }
+
+        // associativity(Symbol def, Associativity assoc, set[Production] alternatives)
+        private Alternative convertAssociativity(IConstructor cons) throws Throwable {
+            Associativity associativity = (Associativity) cons.get("assoc").accept(this);
+            Set<Sequence> seqs = (Set<Sequence>) cons.get("alternatives").accept(this);
+            Alternative.Builder alternativeBuilder = new Alternative.Builder();
+            alternativeBuilder.addSequences(new ArrayList<>(seqs));
+            alternativeBuilder.setAssociativity(associativity);
+            return alternativeBuilder.build();
+        }
+
+        // iter-star-seps(Symbol symbol, list[Symbol] separators)
+        private Star convertIterStarSeps(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
+            Star.Builder starBuilder = new Star.Builder(symbol);
+            for (Symbol separator : separators) {
+                if (!isLayout(separator.getName())) {
+                    starBuilder.addSeparator(separator);
+                }
+            }
+            return starBuilder.build();
+        }
+
+        // iter-star(Symbol symbol)
+        private Star convertIterStar(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            return Star.from(symbol);
+        }
+
+        // iter-seps(Symbol symbol, list[Symbol] separators)
+        private Plus convertIterSeps(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
+            Plus.Builder plusBuilder = new Plus.Builder(symbol);
+            for (Symbol separator : separators) {
+                if (!isLayout(separator.getName())) {
+                    plusBuilder.addSeparator(separator);
+                }
+            }
+            return plusBuilder.build();
+        }
+
+        // iter(Symbol symbol)
+        private Plus convertIter(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            return Plus.from(symbol);
+        }
+
+        // seq(list[Symbol] symbols)
+        private Group convertSeq(IConstructor cons) throws Throwable {
+            List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
+            return Group.from(symbols);
+        }
+
+        // opt(Symbol symbol)
+        private Opt convertOpt(IConstructor cons) throws Throwable {
+            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
+            return Opt.from(symbol);
+        }
+
+        // alt(set[Symbol] alternatives)
+        private Alt convertAlt(IConstructor cons) throws Throwable {
+            Set<Symbol> symbols = (Set<Symbol>) cons.get("alternatives").accept(this);
+            return Alt.from(new ArrayList<>(symbols));
+        }
+
+        // lit(str string)
+        private void convertCilit(IConstructor cons) {
+            throw new RuntimeException("Case-insensitive strings not supported yet");
+        }
+
+        // lit(str string)
+        private Terminal convertLit(IConstructor cons) throws Throwable {
+            String value = (String) cons.get("string").accept(this);
+            RegularExpression regex = Seq.from(value);
+            return new Terminal.Builder(regex)
+                .setNodeType(TerminalNodeType.Regex)
+                .build();
+        }
+
+        private Terminal convertEmpty(IConstructor cons) {
+            return new Terminal.Builder(Terminal.epsilon()).setName("empty").build();
+        }
+
+        // // assoc(Associativity assoc)
+        private Tuple<String, Object> convertAssoc(IConstructor cons) throws Throwable {
+            return Tuple.of(cons.getName(), cons.get("assoc").accept(this));
+        }
+
+        // priority(Symbol def, list[Production] choices)
+        private List<PriorityLevel> convertPriority(IConstructor cons) throws Throwable {
+            List<PriorityLevel> priorityLevels = new ArrayList<>();
+
+            List<Object> choices = (List<Object>) cons.get("choices").accept(this);
+
+            for (Object child : choices) {
+                if (child instanceof Sequence) {
+                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                    Alternative.Builder alternativeBuilder = new Alternative.Builder();
+                    alternativeBuilder.addSequence((Sequence) child);
+                    priorityLevelBuilder.addAlternative(alternativeBuilder.build());
+                    priorityLevels.add(priorityLevelBuilder.build());
+                } else if (child instanceof Alternative) {
+                    PriorityLevel.Builder priorityLevelBuilder = new PriorityLevel.Builder();
+                    priorityLevelBuilder.addAlternative((Alternative) child);
+                    priorityLevels.add(priorityLevelBuilder.build());
+                } else if (child instanceof PriorityLevel) {
+                    priorityLevels.add((PriorityLevel) child);
+                } else if (child instanceof Rule) {
+                    priorityLevels.addAll(((Rule) child).getPriorityLevels());
+                }
+            }
+
+            return priorityLevels;
+        }
+
+        // parameterized-lex(str name, list[Symbol] parameters)
+        private void convertParametrizedLex(IConstructor cons) {
+            throw new RuntimeException("Parametrized lex is not supported yet.");
+        }
+
+        // keywords(str name)
+        private Identifier convertKeywords(IConstructor cons) throws Throwable {
+            String keywords = (String) cons.get("name").accept(this);
+            return Identifier.fromName(keywords);
+        }
+
+        // sort(str name)
+        // lex(str name)
+        // layouts(str name)
+        private Nonterminal convertSort(IConstructor cons) throws Throwable {
+            String nonterminalName = (String) cons.get("name").accept(this);
+            return Nonterminal.withName(nonterminalName);
+        }
+
+        // parameterized-sort(str name, list[Symbol] parameters)
+        private Object convertParametrizedSort(IConstructor cons) {
+            throw new RuntimeException("Parametrized sort is not supported yet.");
+        }
+
+        // prod(Symbol def, list[Symbol] symbols, set[Attr] attributes)
+        private Sequence convertProd(IConstructor cons) throws Throwable {
+            Sequence.Builder sequenceBuilder = new Sequence.Builder();
+
+            Symbol first = (Symbol) cons.get("def").accept(this);
+            if (first.getLabel() != null) {
+                sequenceBuilder.setLabel(first.getLabel());
+            }
+
+            List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
+            for (Symbol symbol : symbols) {
+                if (!isLayout(symbol.getName())) {
+                    sequenceBuilder.addSymbol(symbol);
+                }
+            }
+
+            // attributes
+            Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) cons.get("attributes").accept(this);
+            for (Tuple<String, Object> attribute : attributes) {
+                sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
+            }
+            return sequenceBuilder.build();
+        }
+
+        // choice(Symbol def, set[Production] alternatives)
+        private Rule convertChoice(IConstructor cons) throws Throwable {
+            IValue headDef = cons.get("def");
+
+            Symbol head = (Symbol) headDef.accept(this);
+            Rule.Builder ruleBuilder = new Rule.Builder(Nonterminal.withName(head.getName()));
+
+            Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
+
+            List<PriorityLevel> priorityLevels = new ArrayList<>();
+            addChildren(alternatives, priorityLevels);
+
+            ruleBuilder.addPriorityLevels(priorityLevels);
+
+            LayoutStrategy layoutStrategy;
+            // Do not insert layout for the lexical or layout definitions
+            if (isLexical(headDef) || isLayout(headDef)) {
+                layoutStrategy = LayoutStrategy.NO_LAYOUT;
+            } else {
+                layoutStrategy = LayoutStrategy.INHERITED;
+            }
+
+            ruleBuilder.setLayoutStrategy(layoutStrategy);
+
+            if (isStart(headDef)) return null;
+
+            return ruleBuilder.build();
         }
 
         private boolean isLayout(String name) {
