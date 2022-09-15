@@ -24,8 +24,8 @@ public class RascalGrammarToIguanaGrammarConverter {
         IMap definitions = (IMap) grammar.get("definitions");
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
-        String layout = getLayoutDefinition(definitions);
-        ValueVisitor visitor = new ValueVisitor(layout);
+        Identifier layout = getLayoutDefinition(definitions);
+        ValueVisitor visitor = new ValueVisitor(layout.getName());
 
         while (entryIterator.hasNext()) {
             Map.Entry<IValue, IValue> next = entryIterator.next();
@@ -33,7 +33,10 @@ public class RascalGrammarToIguanaGrammarConverter {
 
             try {
                 Rule rule = (Rule) value.accept(visitor);
-                grammarBuilder.addRule(rule);
+                // Skipped rules, e.g., start rule, are skipped.
+                if (rule != null) {
+                    grammarBuilder.addRule(rule);
+                }
             } catch (Throwable e) {
                 e.printStackTrace();
             }
@@ -41,21 +44,22 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         return grammarBuilder
             .setStartSymbol(visitor.start)
+            .setLayout(layout)
             .build();
     }
 
     // We need to first get the layout definition and then skip them when creating the Iguana grammar rules.
     // Iguana handles layout in a later stage.
-    private static String getLayoutDefinition(IMap definitions) {
+    private static Identifier getLayoutDefinition(IMap definitions) {
         Iterator<IValue> it = definitions.iterator();
-        String layout = null;
+        Identifier layout = null;
         while (it.hasNext()) {
             IValue next = it.next();
             if (isLayout(next)) {
                 String value = ((IString) ((IConstructor) next).get(0)).getValue();
                 // Skip the default layout definition.
                 if (!value.equals("$default$")) {
-                    layout = value;
+                    layout = Identifier.fromName(value);
                 }
             }
         }
@@ -135,6 +139,16 @@ public class RascalGrammarToIguanaGrammarConverter {
             return ((IConstructor) value).getName().equals("lex");
         }
 
+        private static boolean isLayout(IValue value) {
+            if (!(value instanceof IConstructor)) return false;
+            return ((IConstructor) value).getName().equals("layouts");
+        }
+
+        private static boolean isStart(IValue value) {
+            if (!(value instanceof IConstructor)) return false;
+            return ((IConstructor) value).getName().equals("start");
+        }
+
         private void addChildren(Collection<Object> children, List<PriorityLevel> levels) {
             List<Object> alternativesOrSequences = children.stream().filter(c -> c instanceof Alternative || c instanceof Sequence).collect(Collectors.toList());
             List<Object> priorityLevels = children.stream().filter(c -> c instanceof PriorityLevel).collect(Collectors.toList());
@@ -169,7 +183,9 @@ public class RascalGrammarToIguanaGrammarConverter {
             switch (cons.getName()) {
                 // choice(Symbol def, set[Production] alternatives)
                 case "choice": {
-                    Symbol head = (Symbol) cons.get("def").accept(this);
+                    IValue headDef = cons.get("def");
+
+                    Symbol head = (Symbol) headDef.accept(this);
                     Rule.Builder ruleBuilder = new Rule.Builder(Nonterminal.withName(head.getName()));
 
                     Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
@@ -178,12 +194,18 @@ public class RascalGrammarToIguanaGrammarConverter {
                     addChildren(alternatives, priorityLevels);
 
                     ruleBuilder.addPriorityLevels(priorityLevels);
-                    LayoutStrategy layoutStrategy = LayoutStrategy.INHERITED;
-                    if (isLexical(cons.get("def"))) {
+
+                    LayoutStrategy layoutStrategy;
+                    // Do not insert layout for the lexical or layout definitions
+                    if (isLexical(headDef) || isLayout(headDef)) {
                         layoutStrategy = LayoutStrategy.NO_LAYOUT;
+                    } else {
+                        layoutStrategy = LayoutStrategy.INHERITED;
                     }
 
                     ruleBuilder.setLayoutStrategy(layoutStrategy);
+
+                    if (isStart(headDef)) return null;
 
                     return ruleBuilder.build();
                 }
