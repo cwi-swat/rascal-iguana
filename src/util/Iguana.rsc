@@ -12,10 +12,20 @@ alias Parser[&T] = &T (str input, loc origin);
 java Parser[&T] createParser(type[&T] grammar);
 
 void main() {
-    Parser[Program] p = createParser(#Program);
+    Parser[Program] parser = createParser(#Program);
 
     try {
-     println(p("a"));
+        str input =
+            "begin
+            '  declare
+            '     x : natural,
+            '     n : natural;
+            '  x := 4;
+            '  n := 10;
+            '  while n do n := n - 1; x := x + x od
+            'end
+            ";
+        println(parser(input));
     }
     catch ParseError(loc l): {
         printn("parse error <l>");
