@@ -7,9 +7,12 @@ import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
 import org.iguana.grammar.Grammar;
 import org.iguana.parser.IguanaParser;
+import org.iguana.result.ParserResultOps;
+import org.iguana.traversal.DefaultSPPFToParseTreeVisitor;
 import org.iguana.utils.input.Input;
 import org.rascalmpl.values.IRascalValueFactory;
 import org.rascalmpl.values.RascalValueFactory;
+import org.rascalmpl.values.parsetrees.ITree;
 
 public class ParserGenerator {
     private final IRascalValueFactory vf;
@@ -33,11 +36,11 @@ public class ParserGenerator {
             Input input = Input.fromString(inputString.getValue());
             parser.parse(input);
 
-            System.out.println(parser.getParseTree());
-
-            // use the parser here to turn the string into a tree
-            return vf.character('c')/*parse tree*/;
+            RascalParseTreeBuilder parseTreeBuilder = new RascalParseTreeBuilder(vf, input);
+            DefaultSPPFToParseTreeVisitor<ITree> visitor = new DefaultSPPFToParseTreeVisitor<>(parseTreeBuilder, input, false, new ParserResultOps());
+            ITree result = parser.getSPPF().accept(visitor);
+            System.out.println(result);
+            return result;
         });
     }
-
 }

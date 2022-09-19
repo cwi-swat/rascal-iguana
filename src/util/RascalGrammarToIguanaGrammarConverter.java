@@ -7,11 +7,9 @@ import org.iguana.grammar.condition.Condition;
 import org.iguana.grammar.condition.ConditionType;
 import org.iguana.grammar.condition.PositionalCondition;
 import org.iguana.grammar.condition.RegularExpressionCondition;
-import org.iguana.grammar.slot.TerminalNodeType;
 import org.iguana.grammar.symbol.*;
 import org.iguana.regex.CharRange;
 import org.iguana.regex.RegularExpression;
-import org.iguana.regex.Seq;
 import org.iguana.util.Tuple;
 
 import java.util.*;
@@ -25,7 +23,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
         Identifier layout = getLayoutDefinition(definitions);
-        ValueVisitor visitor = new ValueVisitor(layout.getName());
+        ValueVisitor visitor = new ValueVisitor(layout);
 
         while (entryIterator.hasNext()) {
             Map.Entry<IValue, IValue> next = entryIterator.next();
@@ -73,10 +71,10 @@ public class RascalGrammarToIguanaGrammarConverter {
 
     static class ValueVisitor implements IValueVisitor<Object, Throwable> {
 
-        private final String layout;
+        private final Identifier layout;
         private Start start;
 
-        public ValueVisitor(String layout) {
+        public ValueVisitor(Identifier layout) {
             this.layout = layout;
         }
 
@@ -192,8 +190,8 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "non-assoc": return convertNonAssoc(cons);
                 case "start": return convertStart(cons);
                 case "label": return convertLabel(cons);
-                case "range": return convertRange(cons);
                 case "char-class": return convertCharClass(cons);
+                case "range": return convertRange(cons);
                 case "conditional": return convertConditional(cons);
                 case "follow": return convertFollow(cons);
                 case "not-follow": return convertNotFollow(cons);
@@ -326,6 +324,8 @@ public class RascalGrammarToIguanaGrammarConverter {
             for (Tuple<String, Object> attribute : attributes) {
                 sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
             }
+
+            sequenceBuilder.addAttribute("prod", cons);
             return sequenceBuilder.build();
         }
 
@@ -361,12 +361,9 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         // lit(str string)
-        private Terminal convertLit(IConstructor cons) throws Throwable {
-            String value = (String) cons.get("string").accept(this);
-            RegularExpression regex = Seq.from(value);
-            return new Terminal.Builder(regex)
-                .setNodeType(TerminalNodeType.Regex)
-                .build();
+        private Nonterminal convertLit(IConstructor cons) throws Throwable {
+            String nonterminalName = (String) cons.get("string").accept(this);
+            return Nonterminal.withName(nonterminalName);
         }
 
         // lit(str string)
@@ -377,25 +374,25 @@ public class RascalGrammarToIguanaGrammarConverter {
         // alt(set[Symbol] alternatives)
         private Alt convertAlt(IConstructor cons) throws Throwable {
             Set<Symbol> symbols = (Set<Symbol>) cons.get("alternatives").accept(this);
-            return Alt.from(new ArrayList<>(symbols));
+            return new Alt.Builder(new ArrayList<>(symbols)).addAttribute("definition", cons).build();
         }
 
         // opt(Symbol symbol)
         private Opt convertOpt(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return Opt.from(symbol);
+            return new Opt.Builder(symbol).addAttribute("definition", cons).build();
         }
 
         // seq(list[Symbol] symbols)
         private Group convertSeq(IConstructor cons) throws Throwable {
             List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
-            return Group.from(symbols);
+            return new Group.Builder(symbols).addAttribute("definition", cons).build();
         }
 
         // iter(Symbol symbol)
         private Plus convertIter(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return Plus.from(symbol);
+            return new Plus.Builder(symbol).addAttribute("definition", cons).build();
         }
 
         // iter-seps(Symbol symbol, list[Symbol] separators)
@@ -408,13 +405,14 @@ public class RascalGrammarToIguanaGrammarConverter {
                     plusBuilder.addSeparator(separator);
                 }
             }
+            plusBuilder.addAttribute("definition", cons);
             return plusBuilder.build();
         }
 
         // iter-star(Symbol symbol)
         private Star convertIterStar(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return Star.from(symbol);
+            return new Star.Builder(symbol).addAttribute("definition", cons).build();
         }
 
         // iter-star-seps(Symbol symbol, list[Symbol] separators)
@@ -427,6 +425,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                     starBuilder.addSeparator(separator);
                 }
             }
+            starBuilder.addAttribute("definition", cons);
             return starBuilder.build();
         }
 
@@ -463,7 +462,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // start(Symbol symbol)
         private Nonterminal convertStart(IConstructor cons) throws Throwable {
             Nonterminal nonterminal = (Nonterminal) cons.get("symbol").accept(this);
-            start = Start.from(nonterminal.getName());
+            start = new Start.Builder(nonterminal.getName()).addAttribute("definition", cons).build();
             return nonterminal;
         }
 
@@ -474,18 +473,17 @@ public class RascalGrammarToIguanaGrammarConverter {
             return symbol.copy().setLabel(label).build();
         }
 
+        // char-class(list[CharRange] ranges)
+        private Terminal convertCharClass(IConstructor cons) throws Throwable {
+            List<CharRange> ranges = (List<CharRange>) cons.get("ranges").accept(this);
+            return Terminal.from(org.iguana.regex.Alt.from(ranges));
+        }
+
         // range(int begin, int end)
         private CharRange convertRange(IConstructor cons) throws Throwable {
             Integer start = (Integer) cons.get("begin").accept(this);
             Integer end = (Integer) cons.get("end").accept(this);
             return CharRange.in(start, end);
-        }
-
-        // char-class(list[CharRange] ranges)
-        private Alt convertCharClass(IConstructor cons) throws Throwable {
-            List<CharRange> ranges = (List<CharRange>) cons.get("ranges").accept(this);
-            List<Symbol> terminals = ranges.stream().map(Terminal::from).collect(Collectors.toList());
-            return Alt.from(terminals);
         }
 
         // conditional(Symbol symbol, set[Condition] conditions)
@@ -611,7 +609,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         private boolean isLayout(String name) {
-            return layout != null && layout.equals(name);
+            return layout != null && layout.getName().equals(name);
         }
 
         private static boolean isRegex(Symbol symbol) {
