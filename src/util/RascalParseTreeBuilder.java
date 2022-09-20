@@ -3,8 +3,7 @@ package util;
 import io.usethesource.vallang.IConstructor;
 import io.usethesource.vallang.type.Type;
 import org.iguana.grammar.runtime.RuntimeRule;
-import org.iguana.grammar.symbol.Symbol;
-import org.iguana.grammar.symbol.Terminal;
+import org.iguana.grammar.symbol.*;
 import org.iguana.parsetree.ParseTreeBuilder;
 import org.iguana.regex.Char;
 import org.iguana.regex.CharRange;
@@ -50,10 +49,39 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
     }
 
     @Override
-    public ITree metaSymbolNode(Symbol symbol, List<ITree> children, int leftExtent, int rightExtent) {
+    public ITree starNode(Star symbol, List<ITree> children, int leftExtent, int rightExtent) {
+        return null;
+    }
+
+    @Override
+    public ITree plusNode(Plus symbol, List<ITree> children, int leftExtent, int rightExtent) {
+        return vf.appl(getRegularDefinition(symbol), children.toArray(ITree[]::new));
+    }
+
+    @Override
+    public ITree optNode(Opt symbol, ITree child, int leftExtent, int rightExtent) {
+        return vf.appl(getRegularDefinition(symbol), new ITree[] { child });
+    }
+
+    @Override
+    public ITree altNode(Alt symbol, ITree child, int leftExtent, int rightExtent) {
+        return vf.appl(getRegularDefinition(symbol), new ITree[] { child });
+    }
+
+    @Override
+    public ITree groupNode(Group symbol, List<ITree> children, int leftExtent, int rightExtent) {
+        return vf.appl(getRegularDefinition(symbol), children.toArray(ITree[]::new));
+    }
+
+    @Override
+    public ITree startNode(Start symbol, List<ITree> children, int leftExtent, int rightExtent) {
+        IConstructor definition = (IConstructor) symbol.getAttributes().get("prod");
+        return vf.appl(definition, children.toArray(ITree[]::new));
+    }
+
+    private IConstructor getRegularDefinition(Symbol symbol) {
         IConstructor definition = (IConstructor) symbol.getAttributes().get("definition");
         Type regular = RascalValueFactory.Production_Regular;
-        IConstructor prod = vf.constructor(regular, definition);
-        return vf.appl(prod, children.toArray(ITree[]::new));
+        return vf.constructor(regular, definition);
     }
 }

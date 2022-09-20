@@ -274,6 +274,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
             ruleBuilder.setLayoutStrategy(layoutStrategy);
 
+            // Skip the start rule, the start rule is generated in Iguana, as it may need some variable threading.
             if (isStart(headDef)) return null;
 
             return ruleBuilder.build();
@@ -307,9 +308,10 @@ public class RascalGrammarToIguanaGrammarConverter {
         private Sequence convertProd(IConstructor cons) throws Throwable {
             Sequence.Builder sequenceBuilder = new Sequence.Builder();
 
-            Symbol first = (Symbol) cons.get("def").accept(this);
-            if (first.getLabel() != null) {
-                sequenceBuilder.setLabel(first.getLabel());
+            // The label for the alternative
+            Symbol def = (Symbol) cons.get("def").accept(this);
+            if (def.getLabel() != null) {
+                sequenceBuilder.setLabel(def.getLabel());
             }
 
             List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
@@ -326,6 +328,13 @@ public class RascalGrammarToIguanaGrammarConverter {
             }
 
             sequenceBuilder.addAttribute("prod", cons);
+
+            if (isStart(cons.get("def"))) {
+                assert start != null;
+                // We need to store the start prod definition here for building the parse tree.
+                start = start.copy().addAttribute("prod", cons).build();
+            }
+
             return sequenceBuilder.build();
         }
 
