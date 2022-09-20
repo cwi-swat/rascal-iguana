@@ -39,7 +39,6 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
     @Override
     public ITree nonterminalNode(RuntimeRule rule, List<ITree> children, int leftExtent, int rightExtent) {
         IConstructor prod = (IConstructor) rule.getAttributes().get("prod");
-        if (prod == null) throw new RuntimeException("prod should not be null for");
         return vf.appl(prod, vf.list(children.toArray(ITree[]::new)));
     }
 
@@ -50,7 +49,7 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
 
     @Override
     public ITree starNode(Star symbol, List<ITree> children, int leftExtent, int rightExtent) {
-        return null;
+        return vf.appl(getRegularDefinition(symbol), children.toArray(ITree[]::new));
     }
 
     @Override
