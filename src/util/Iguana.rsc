@@ -37,7 +37,7 @@ void main() {
             '  while n do n := n - 1; x := x + x od
             'end
             ";
-        println(parser("b"));
+        iprintln(parser("b"));
     }
     catch ParseError(loc l): {
         printn("parse error <l>");

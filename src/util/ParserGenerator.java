@@ -38,9 +38,7 @@ public class ParserGenerator {
 
             RascalParseTreeBuilder parseTreeBuilder = new RascalParseTreeBuilder(vf, input);
             DefaultSPPFToParseTreeVisitor<ITree> visitor = new DefaultSPPFToParseTreeVisitor<>(parseTreeBuilder, input, false, new ParserResultOps());
-            ITree result = parser.getSPPF().accept(visitor);
-            System.out.println(result);
-            return result;
+            return parser.getSPPF().accept(visitor);
         });
     }
 }
