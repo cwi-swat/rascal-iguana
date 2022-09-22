@@ -7,6 +7,7 @@ import org.iguana.grammar.symbol.*;
 import org.iguana.parsetree.ParseTreeBuilder;
 import org.iguana.regex.Char;
 import org.iguana.regex.CharRange;
+import org.iguana.regex.Epsilon;
 import org.iguana.regex.RegularExpression;
 import org.iguana.utils.input.Input;
 import org.rascalmpl.values.IRascalValueFactory;
@@ -29,11 +30,13 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
     @Override
     public ITree terminalNode(Terminal terminal, int leftExtent, int rightExtent) {
         RegularExpression regex = terminal.getRegularExpression();
+        if (regex instanceof Epsilon) {
+            return null;
+        }
         if (regex instanceof CharRange || regex instanceof Char || regex instanceof org.iguana.regex.Alt<?>) {
             return vf.character(input.charAt(leftExtent));
-        } else {
-            throw new RuntimeException("Regex should be a char, char range or char class");
         }
+        throw new RuntimeException("Regex should be a char, char range or char class, but was: " + regex);
     }
 
     @Override

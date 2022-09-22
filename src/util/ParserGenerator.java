@@ -29,6 +29,11 @@ public class ParserGenerator {
         RascalGrammarToIguanaGrammarConverter converter = new RascalGrammarToIguanaGrammarConverter();
         Grammar iguanaGrammar = converter.convert((IConstructor) grammar);
         IguanaParser parser = new IguanaParser(iguanaGrammar);
+        System.out.println(">>>>" + iguanaGrammar.getLayout());
+        System.out.println(">>>>" + parser.getFinalGrammar().getLayout());
+        System.out.println(grammar);
+        System.out.println("-------------------");
+        System.out.println(parser.getFinalGrammar());
 
         return vf.function(ftype, (args, kwArgs) -> {
             // input is a string for now 

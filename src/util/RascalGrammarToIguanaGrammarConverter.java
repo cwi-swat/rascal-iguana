@@ -55,10 +55,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             IValue next = it.next();
             if (isLayout(next)) {
                 String value = ((IString) ((IConstructor) next).get(0)).getValue();
-                // Skip the default layout definition.
-                if (!value.equals("$default$")) {
-                    layout = Identifier.fromName(value);
-                }
+                layout = Identifier.fromName(value);
             }
         }
         return layout;
