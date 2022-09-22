@@ -240,6 +240,11 @@ public class RascalGrammarToIguanaGrammarConverter {
             return ((IConstructor) value).getName().equals("lex");
         }
 
+        private static boolean isLiteral(IValue value) {
+            if (!(value instanceof IConstructor)) return false;
+            return ((IConstructor) value).getName().equals("lit");
+        }
+
         private static boolean isLayout(IValue value) {
             if (!(value instanceof IConstructor)) return false;
             return ((IConstructor) value).getName().equals("layouts");
@@ -265,8 +270,8 @@ public class RascalGrammarToIguanaGrammarConverter {
             ruleBuilder.addPriorityLevels(priorityLevels);
 
             LayoutStrategy layoutStrategy;
-            // Do not insert layout for the lexical or layout definitions
-            if (isLexical(headDef) || isLayout(headDef)) {
+            // Do not insert layout for the lexical, literal or layout definitions
+            if (isLexical(headDef) || isLayout(headDef) || isLiteral(headDef)) {
                 layoutStrategy = LayoutStrategy.NO_LAYOUT;
             } else {
                 layoutStrategy = LayoutStrategy.INHERITED;
