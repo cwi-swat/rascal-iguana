@@ -7,10 +7,10 @@ import lang::rascal::grammar::definition::Literals;
 
 
 // import lang::rascal::\syntax::Rascal;
-//import demo::lang::Pico::Syntax;
+import demo::lang::Pico::Syntax;
 
-start syntax A = B*;
-syntax B = "b";
+// start syntax A = B*;
+//syntax B = "b";
 
 alias Parser[&T] = &T (str input, loc origin);
 
@@ -24,7 +24,7 @@ java Parser[&T] createParser(type[&T] grammar);
 }
 
 void main() {
-    Parser[A] parser = createParser(expand(#A));
+    Parser[Program] parser = createParser(expand(#Program));
 
     try {
         str input =
@@ -37,7 +37,7 @@ void main() {
             '  while n do n := n - 1; x := x + x od
             'end
             ";
-        iprintln(parser("b"));
+        println(parser(input));
     }
     catch ParseError(loc l): {
         printn("parse error <l>");

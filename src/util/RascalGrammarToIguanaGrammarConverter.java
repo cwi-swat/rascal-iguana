@@ -50,12 +50,15 @@ public class RascalGrammarToIguanaGrammarConverter {
     // Iguana handles layout in a later stage.
     private static Identifier getLayoutDefinition(IMap definitions) {
         Iterator<IValue> it = definitions.iterator();
-        Identifier layout = null;
+        // There is a default layout definition in Rascal grammars: $default = epsilon.
+        Identifier layout = Identifier.fromName("$default");
         while (it.hasNext()) {
             IValue next = it.next();
             if (isLayout(next)) {
                 String value = ((IString) ((IConstructor) next).get(0)).getValue();
-                layout = Identifier.fromName(value);
+                if (!value.equals("$default$")) {
+                    layout = Identifier.fromName(value);
+                }
             }
         }
         return layout;
