@@ -2,17 +2,29 @@ module util::Iguana
 
 extend ParseTree;
 import IO;
+import Grammar;
+import lang::rascal::grammar::definition::Literals;
+
 
 // import lang::rascal::\syntax::Rascal;
 import demo::lang::Pico::Syntax;
 
+// start syntax A = B*;
+//syntax B = "b";
+
 alias Parser[&T] = &T (str input, loc origin);
+
 
 @javaClass{util.ParserGenerator}
 java Parser[&T] createParser(type[&T] grammar);
 
+&T expand(&T t) {
+    Grammar g = literals(grammar(t));
+    return type(t.symbol, g.rules);
+}
+
 void main() {
-    Parser[Program] parser = createParser(#Program);
+    Parser[Program] parser = createParser(expand(#Program));
 
     try {
         str input =
@@ -25,7 +37,7 @@ void main() {
             '  while n do n := n - 1; x := x + x od
             'end
             ";
-        println(parser(input));
+        iprintln(parser(input));
     }
     catch ParseError(loc l): {
         printn("parse error <l>");
