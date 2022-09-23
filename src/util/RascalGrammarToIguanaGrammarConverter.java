@@ -531,32 +531,27 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // follow(Symbol symbol)
         private RegularExpressionCondition convertFollow(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return RegularExpressionCondition.follow(getRegex(symbol));
+            return RegularExpressionCondition.follow(getRegex(cons.get("symbol")));
         }
 
         // not-follow(Symbol symbol)
         private RegularExpressionCondition convertNotFollow(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return RegularExpressionCondition.notFollow(getRegex(symbol));
+            return RegularExpressionCondition.notFollow(getRegex(cons.get("symbol")));
         }
 
         // precede(Symbol symbol)
         private RegularExpressionCondition convertPrecede(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return RegularExpressionCondition.precede(getRegex(symbol));
+            return RegularExpressionCondition.precede(getRegex(cons.get("symbol")));
         }
 
         // not-precede(Symbol symbol)
         private RegularExpressionCondition convertNotPrecede(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return RegularExpressionCondition.notPrecede(getRegex(symbol));
+            return RegularExpressionCondition.notPrecede(getRegex(cons.get("symbol")));
         }
 
         // delete(Symbol symbol)
         private RegularExpressionCondition convertDelete(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            return RegularExpressionCondition.notMatch(getRegex(symbol));
+            return RegularExpressionCondition.notMatch(getRegex(cons.get("symbol")));
         }
 
         // at-column(int column)
@@ -604,6 +599,21 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         private boolean isLayout(String name) {
             return layout != null && layout.getName().equals(name);
+        }
+
+        private RegularExpression getRegex(IValue value) throws Throwable {
+            // String literals are expanded, so here we have to explicitly create a regular expression out of them.
+            if (isLiteral(value)) {
+                IString literalValue = (IString) ((IConstructor) value).get("string");
+                int length = literalValue.length();
+                List<org.iguana.regex.Char> chars = new ArrayList<>(length);
+                for (int i = 0; i < length; i++) {
+                    chars.add(org.iguana.regex.Char.from(literalValue.charAt(i)));
+                }
+                return org.iguana.regex.Seq.from(chars);
+            }
+
+            return getRegex((Symbol) value.accept(this));
         }
 
         private static RegularExpression getRegex(Symbol symbol) {
