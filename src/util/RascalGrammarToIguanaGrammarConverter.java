@@ -532,51 +532,31 @@ public class RascalGrammarToIguanaGrammarConverter {
         // follow(Symbol symbol)
         private RegularExpressionCondition convertFollow(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.follow(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.follow(getRegex(symbol));
         }
 
         // not-follow(Symbol symbol)
         private RegularExpressionCondition convertNotFollow(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.notFollow(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.notFollow(getRegex(symbol));
         }
 
         // precede(Symbol symbol)
         private RegularExpressionCondition convertPrecede(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.precede(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.precede(getRegex(symbol));
         }
 
         // not-precede(Symbol symbol)
         private RegularExpressionCondition convertNotPrecede(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.notPrecede(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.notPrecede(getRegex(symbol));
         }
 
         // delete(Symbol symbol)
         private RegularExpressionCondition convertDelete(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.notMatch(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.notMatch(getRegex(symbol));
         }
 
         // at-column(int column)
@@ -626,36 +606,6 @@ public class RascalGrammarToIguanaGrammarConverter {
             return layout != null && layout.getName().equals(name);
         }
 
-        private static boolean isRegex(Symbol symbol) {
-            if (symbol instanceof Terminal) {
-                return true;
-            }
-            if (symbol instanceof Identifier) {
-                return true;
-            }
-            if (symbol instanceof Alt) {
-                Alt alt = (Alt) symbol;
-                return alt.getChildren().stream().allMatch(ValueVisitor::isRegex);
-            }
-            if (symbol instanceof Star) {
-                Star star = (Star) symbol;
-                return isRegex(star.getSymbol());
-            }
-            if (symbol instanceof Plus) {
-                Plus plus = (Plus) symbol;
-                return isRegex(plus.getSymbol());
-            }
-            if (symbol instanceof Opt) {
-                Opt opt = (Opt) symbol;
-                return isRegex(opt.getSymbol());
-            }
-            if (symbol instanceof Group) {
-                Group group = (Group) symbol;
-                return group.getChildren().stream().allMatch(ValueVisitor::isRegex);
-            }
-            return false;
-        }
-
         private static RegularExpression getRegex(Symbol symbol) {
             if (symbol instanceof Terminal) {
                 return ((Terminal) symbol).getRegularExpression();
@@ -685,7 +635,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 List<RegularExpression> regexes = group.getChildren().stream().map(ValueVisitor::getRegex).collect(Collectors.toList());
                 return org.iguana.regex.Seq.from(regexes);
             }
-            throw new RuntimeException("Should not reach here");
+            throw new RuntimeException("Should be a regular expression, but was: " + symbol.getClass());
         }
     }
 }
