@@ -15,6 +15,8 @@ import org.iguana.util.Tuple;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.iguana.utils.string.StringUtil.listToString;
+
 public class RascalGrammarToIguanaGrammarConverter {
 
     public Grammar convert(IConstructor grammar) {
@@ -23,6 +25,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
         Identifier layout = getLayoutDefinition(definitions);
+        System.out.println(">>>>> layout: " + layout);
         ValueVisitor visitor = new ValueVisitor(layout);
 
         while (entryIterator.hasNext()) {
@@ -51,7 +54,7 @@ public class RascalGrammarToIguanaGrammarConverter {
     private static Identifier getLayoutDefinition(IMap definitions) {
         Iterator<IValue> it = definitions.iterator();
         // There is a default layout definition in Rascal grammars: $default = epsilon.
-        Identifier layout = Identifier.fromName("$default");
+        Identifier layout = Identifier.fromName("$default$");
         while (it.hasNext()) {
             IValue next = it.next();
             if (isLayout(next)) {
@@ -300,8 +303,10 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         // parameterized-sort(str name, list[Symbol] parameters)
-        private Object convertParametrizedSort(IConstructor cons) {
-            throw new RuntimeException("Parametrized sort is not supported yet.");
+        private Object convertParametrizedSort(IConstructor cons) throws Throwable {
+            String name = (String) cons.get("name").accept(this);
+            List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
+            return Nonterminal.withName(name + "_" + listToString(parameters, "_"));
         }
 
         // parameterized-lex(str name, list[Symbol] parameters)
