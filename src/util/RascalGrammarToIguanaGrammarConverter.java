@@ -25,7 +25,6 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         Iterator<Map.Entry<IValue, IValue>> entryIterator = definitions.entryIterator();
         Identifier layout = getLayoutDefinition(definitions);
-        System.out.println(">>>>> layout: " + layout);
         ValueVisitor visitor = new ValueVisitor(layout);
 
         while (entryIterator.hasNext()) {
@@ -174,7 +173,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "layouts": return convertSort(cons);
                 case "keywords": return convertKeywords(cons);
                 case "parameterized-sort": return convertParametrizedSort(cons);
-                case "parameterized-lex": convertParametrizedLex(cons);
+                case "parameterized-lex": return convertParametrizedLex(cons);
                 case "priority": return convertPriority(cons);
                 case "empty": return convertEmpty(cons);
                 case "lit": return convertLit(cons);
@@ -240,7 +239,8 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         private static boolean isLexical(IValue value) {
             if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("lex");
+            String name = ((IConstructor) value).getName();
+            return name.equals("lex") || name.equals("parameterized-lex");
         }
 
         private static boolean isLiteral(IValue value) {
@@ -303,15 +303,15 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         // parameterized-sort(str name, list[Symbol] parameters)
-        private Object convertParametrizedSort(IConstructor cons) throws Throwable {
+        private Nonterminal convertParametrizedSort(IConstructor cons) throws Throwable {
             String name = (String) cons.get("name").accept(this);
             List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
             return Nonterminal.withName(name + "_" + listToString(parameters, "_"));
         }
 
         // parameterized-lex(str name, list[Symbol] parameters)
-        private void convertParametrizedLex(IConstructor cons) {
-            throw new RuntimeException("Parametrized lex is not supported yet.");
+        private Nonterminal convertParametrizedLex(IConstructor cons) throws Throwable {
+            return convertParametrizedSort(cons);
         }
 
         // prod(Symbol def, list[Symbol] symbols, set[Attr] attributes)
@@ -332,12 +332,20 @@ public class RascalGrammarToIguanaGrammarConverter {
             }
 
             // attributes
+            // TODO: check if this is necessary, or just having the Rascal definition is enough to retrieve these info.
             Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) cons.get("attributes").accept(this);
             for (Tuple<String, Object> attribute : attributes) {
                 sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
             }
-
             sequenceBuilder.addAttribute("prod", cons);
+
+            for (Tuple<String, Object> entry : attributes) {
+                if (entry.getFirst().equals("assoc")) {
+                    Associativity associativity = (Associativity) entry.getSecond();
+                    sequenceBuilder.setAssociativity(associativity);
+                }
+                break;
+            }
 
             if (isStart(cons.get("def"))) {
                 assert start != null;
@@ -454,7 +462,11 @@ public class RascalGrammarToIguanaGrammarConverter {
             Set<Sequence> seqs = (Set<Sequence>) cons.get("alternatives").accept(this);
             Alternative.Builder alternativeBuilder = new Alternative.Builder();
             alternativeBuilder.addSequences(new ArrayList<>(seqs));
-            alternativeBuilder.setAssociativity(associativity);
+            // Iguana only supports associativity for groups of size at least 2.
+            // Associativity groups of size 0 or 1 are simple sequences which can have their own associativity.
+            if (seqs.size() > 1) {
+                alternativeBuilder.setAssociativity(associativity);
+            }
             return alternativeBuilder.build();
         }
 
@@ -592,14 +604,12 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // parameter(str name, Symbol bound)
         private void convertParameter(IConstructor cons) {
-            throw new RuntimeException("Parameter is not supported yet");
+            throw new RuntimeException("Parameters are expanded before conversion.");
         }
 
         // adt(str name, list[Symbol] parameters)
-        private Tuple<String, List<Symbol>> convertADT(IConstructor cons) throws Throwable {
-            String name = (String) cons.get("name").accept(this);
-            List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
-            return Tuple.of(name, parameters);
+        private Tuple<String, List<Symbol>> convertADT(IConstructor cons) {
+            throw new RuntimeException("Parametrized sorts are expanded before conversion.");
         }
 
         private boolean isLayout(String name) {
