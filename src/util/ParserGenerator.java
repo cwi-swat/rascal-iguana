@@ -6,6 +6,7 @@ import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
 import org.iguana.grammar.Grammar;
+import org.iguana.grammar.symbol.Symbol;
 import org.iguana.parser.IguanaParser;
 import org.iguana.result.ParserResultOps;
 import org.iguana.traversal.DefaultSPPFToParseTreeVisitor;
@@ -22,7 +23,7 @@ public class ParserGenerator {
     public ParserGenerator(IRascalValueFactory vf, TypeFactory tf) {
         this.vf = vf;
         this.tf = tf;
-        this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(tf.stringType()), tf.tupleEmpty());
+        this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(RascalValueFactory.Tree, tf.stringType()), tf.tupleEmpty());
     }
 
     public IValue createParser(IValue grammar) {
@@ -31,10 +32,17 @@ public class ParserGenerator {
         IguanaParser parser = new IguanaParser(iguanaGrammar);
 
         return vf.function(ftype, (args, kwArgs) -> {
-            // input is a string for now 
-            IString inputString = (IString) args[0];
+            // input is a string for now
+            IConstructor symbol = (IConstructor) args[0];
+            Symbol start;
+            try {
+                start = (Symbol) symbol.accept(new RascalGrammarToIguanaGrammarConverter.ValueVisitor());
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+            IString inputString = (IString) args[1];
             Input input = Input.fromString(inputString.getValue());
-            parser.parse(input);
+            parser.parse(input, start);
 
             RascalParseTreeBuilder parseTreeBuilder = new RascalParseTreeBuilder(vf, input);
             DefaultSPPFToParseTreeVisitor<ITree> visitor = new DefaultSPPFToParseTreeVisitor<>(parseTreeBuilder, input, false, new ParserResultOps());

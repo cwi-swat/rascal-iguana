@@ -43,7 +43,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         return grammarBuilder
-            .setStartSymbol(visitor.start)
+            .setStartSymbols(new ArrayList<>(visitor.starts.values()))
             .setLayout(layout)
             .build();
     }
@@ -74,7 +74,11 @@ public class RascalGrammarToIguanaGrammarConverter {
     static class ValueVisitor implements IValueVisitor<Object, Throwable> {
 
         private final Identifier layout;
-        private Start start;
+        private final Map<IValue, Start> starts = new HashMap<>();
+
+        public ValueVisitor() {
+            this(null);
+        }
 
         public ValueVisitor(Identifier layout) {
             this.layout = layout;
@@ -318,9 +322,11 @@ public class RascalGrammarToIguanaGrammarConverter {
         private Sequence convertProd(IConstructor cons) throws Throwable {
             Sequence.Builder sequenceBuilder = new Sequence.Builder();
 
+            String label = null;
             // The label for the alternative
             Symbol def = (Symbol) cons.get("def").accept(this);
             if (def.getLabel() != null) {
+                label = def.getLabel();
                 sequenceBuilder.setLabel(def.getLabel());
             }
 
@@ -343,14 +349,15 @@ public class RascalGrammarToIguanaGrammarConverter {
                 if (entry.getFirst().equals("assoc")) {
                     Associativity associativity = (Associativity) entry.getSecond();
                     sequenceBuilder.setAssociativity(associativity);
+                    break;
                 }
-                break;
             }
 
             if (isStart(cons.get("def"))) {
+                Start start = starts.get(cons.get("def"));
                 assert start != null;
                 // We need to store the start prod definition here for building the parse tree.
-                start = start.copy().addAttribute("prod", cons).build();
+                starts.put(cons.get("def"), start.copy().addAttribute("prod", cons).build());
             }
 
             return sequenceBuilder.build();
@@ -493,7 +500,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // start(Symbol symbol)
         private Nonterminal convertStart(IConstructor cons) throws Throwable {
             Nonterminal nonterminal = (Nonterminal) cons.get("symbol").accept(this);
-            start = new Start.Builder(nonterminal.getName()).addAttribute("definition", cons).build();
+            starts.put(cons, new Start.Builder(nonterminal.getName()).addAttribute("definition", cons).build());
             return nonterminal;
         }
 
