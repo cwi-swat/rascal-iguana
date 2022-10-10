@@ -397,7 +397,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // lit(str string)
         private Nonterminal convertLit(IConstructor cons) throws Throwable {
             String nonterminalName = (String) cons.get("string").accept(this);
-            return Nonterminal.withName(nonterminalName);
+            return Nonterminal.withName("\"" + nonterminalName + "\"");
         }
 
         // lit(str string)

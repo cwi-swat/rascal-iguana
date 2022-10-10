@@ -29,6 +29,7 @@ public class ParserGenerator {
     public IValue createParser(IValue grammar) {
         RascalGrammarToIguanaGrammarConverter converter = new RascalGrammarToIguanaGrammarConverter();
         Grammar iguanaGrammar = converter.convert((IConstructor) grammar);
+        System.out.println(iguanaGrammar);
         IguanaParser parser = new IguanaParser(iguanaGrammar);
 
         return vf.function(ftype, (args, kwArgs) -> {
