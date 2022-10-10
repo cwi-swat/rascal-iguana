@@ -15,6 +15,8 @@ import org.iguana.util.Tuple;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.iguana.utils.string.StringUtil.listToString;
+
 public class RascalGrammarToIguanaGrammarConverter {
 
     public Grammar convert(IConstructor grammar) {
@@ -41,7 +43,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         return grammarBuilder
-            .setStartSymbol(visitor.start)
+            .setStartSymbols(new ArrayList<>(visitor.starts.values()))
             .setLayout(layout)
             .build();
     }
@@ -51,7 +53,7 @@ public class RascalGrammarToIguanaGrammarConverter {
     private static Identifier getLayoutDefinition(IMap definitions) {
         Iterator<IValue> it = definitions.iterator();
         // There is a default layout definition in Rascal grammars: $default = epsilon.
-        Identifier layout = Identifier.fromName("$default");
+        Identifier layout = Identifier.fromName("$default$");
         while (it.hasNext()) {
             IValue next = it.next();
             if (isLayout(next)) {
@@ -72,7 +74,11 @@ public class RascalGrammarToIguanaGrammarConverter {
     static class ValueVisitor implements IValueVisitor<Object, Throwable> {
 
         private final Identifier layout;
-        private Start start;
+        private final Map<IValue, Start> starts = new HashMap<>();
+
+        public ValueVisitor() {
+            this(null);
+        }
 
         public ValueVisitor(Identifier layout) {
             this.layout = layout;
@@ -171,7 +177,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 case "layouts": return convertSort(cons);
                 case "keywords": return convertKeywords(cons);
                 case "parameterized-sort": return convertParametrizedSort(cons);
-                case "parameterized-lex": convertParametrizedLex(cons);
+                case "parameterized-lex": return convertParametrizedLex(cons);
                 case "priority": return convertPriority(cons);
                 case "empty": return convertEmpty(cons);
                 case "lit": return convertLit(cons);
@@ -237,7 +243,8 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         private static boolean isLexical(IValue value) {
             if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("lex");
+            String name = ((IConstructor) value).getName();
+            return name.equals("lex") || name.equals("parameterized-lex");
         }
 
         private static boolean isLiteral(IValue value) {
@@ -300,22 +307,26 @@ public class RascalGrammarToIguanaGrammarConverter {
         }
 
         // parameterized-sort(str name, list[Symbol] parameters)
-        private Object convertParametrizedSort(IConstructor cons) {
-            throw new RuntimeException("Parametrized sort is not supported yet.");
+        private Nonterminal convertParametrizedSort(IConstructor cons) throws Throwable {
+            String name = (String) cons.get("name").accept(this);
+            List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
+            return Nonterminal.withName(name + "_" + listToString(parameters, "_"));
         }
 
         // parameterized-lex(str name, list[Symbol] parameters)
-        private void convertParametrizedLex(IConstructor cons) {
-            throw new RuntimeException("Parametrized lex is not supported yet.");
+        private Nonterminal convertParametrizedLex(IConstructor cons) throws Throwable {
+            return convertParametrizedSort(cons);
         }
 
         // prod(Symbol def, list[Symbol] symbols, set[Attr] attributes)
         private Sequence convertProd(IConstructor cons) throws Throwable {
             Sequence.Builder sequenceBuilder = new Sequence.Builder();
 
+            String label = null;
             // The label for the alternative
             Symbol def = (Symbol) cons.get("def").accept(this);
             if (def.getLabel() != null) {
+                label = def.getLabel();
                 sequenceBuilder.setLabel(def.getLabel());
             }
 
@@ -327,17 +338,26 @@ public class RascalGrammarToIguanaGrammarConverter {
             }
 
             // attributes
+            // TODO: check if this is necessary, or just having the Rascal definition is enough to retrieve these info.
             Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) cons.get("attributes").accept(this);
             for (Tuple<String, Object> attribute : attributes) {
                 sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
             }
-
             sequenceBuilder.addAttribute("prod", cons);
 
+            for (Tuple<String, Object> entry : attributes) {
+                if (entry.getFirst().equals("assoc")) {
+                    Associativity associativity = (Associativity) entry.getSecond();
+                    sequenceBuilder.setAssociativity(associativity);
+                    break;
+                }
+            }
+
             if (isStart(cons.get("def"))) {
+                Start start = starts.get(cons.get("def"));
                 assert start != null;
                 // We need to store the start prod definition here for building the parse tree.
-                start = start.copy().addAttribute("prod", cons).build();
+                starts.put(cons.get("def"), start.copy().addAttribute("prod", cons).build());
             }
 
             return sequenceBuilder.build();
@@ -377,7 +397,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // lit(str string)
         private Nonterminal convertLit(IConstructor cons) throws Throwable {
             String nonterminalName = (String) cons.get("string").accept(this);
-            return Nonterminal.withName(nonterminalName);
+            return Nonterminal.withName("\"" + nonterminalName + "\"");
         }
 
         // lit(str string)
@@ -449,7 +469,11 @@ public class RascalGrammarToIguanaGrammarConverter {
             Set<Sequence> seqs = (Set<Sequence>) cons.get("alternatives").accept(this);
             Alternative.Builder alternativeBuilder = new Alternative.Builder();
             alternativeBuilder.addSequences(new ArrayList<>(seqs));
-            alternativeBuilder.setAssociativity(associativity);
+            // Iguana only supports associativity for groups of size at least 2.
+            // Associativity groups of size 0 or 1 are simple sequences which can have their own associativity.
+            if (seqs.size() > 1) {
+                alternativeBuilder.setAssociativity(associativity);
+            }
             return alternativeBuilder.build();
         }
 
@@ -476,7 +500,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // start(Symbol symbol)
         private Nonterminal convertStart(IConstructor cons) throws Throwable {
             Nonterminal nonterminal = (Nonterminal) cons.get("symbol").accept(this);
-            start = new Start.Builder(nonterminal.getName()).addAttribute("definition", cons).build();
+            starts.put(cons, new Start.Builder(nonterminal.getName()).addAttribute("definition", cons).build());
             return nonterminal;
         }
 
@@ -531,52 +555,27 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // follow(Symbol symbol)
         private RegularExpressionCondition convertFollow(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.follow(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.follow(getRegex(cons.get("symbol")));
         }
 
         // not-follow(Symbol symbol)
         private RegularExpressionCondition convertNotFollow(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.notFollow(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.notFollow(getRegex(cons.get("symbol")));
         }
 
         // precede(Symbol symbol)
         private RegularExpressionCondition convertPrecede(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.precede(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.precede(getRegex(cons.get("symbol")));
         }
 
         // not-precede(Symbol symbol)
         private RegularExpressionCondition convertNotPrecede(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.notPrecede(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.notPrecede(getRegex(cons.get("symbol")));
         }
 
         // delete(Symbol symbol)
         private RegularExpressionCondition convertDelete(IConstructor cons) throws Throwable {
-            Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            if (isRegex(symbol)) {
-                return RegularExpressionCondition.notMatch(getRegex(symbol));
-            } else {
-                throw new RuntimeException("Must only be a regular expression: " + symbol);
-            }
+            return RegularExpressionCondition.notMatch(getRegex(cons.get("symbol")));
         }
 
         // at-column(int column)
@@ -612,48 +611,31 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // parameter(str name, Symbol bound)
         private void convertParameter(IConstructor cons) {
-            throw new RuntimeException("Parameter is not supported yet");
+            throw new RuntimeException("Parameters are expanded before conversion.");
         }
 
         // adt(str name, list[Symbol] parameters)
-        private Tuple<String, List<Symbol>> convertADT(IConstructor cons) throws Throwable {
-            String name = (String) cons.get("name").accept(this);
-            List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
-            return Tuple.of(name, parameters);
+        private Tuple<String, List<Symbol>> convertADT(IConstructor cons) {
+            throw new RuntimeException("Parametrized sorts are expanded before conversion.");
         }
 
         private boolean isLayout(String name) {
             return layout != null && layout.getName().equals(name);
         }
 
-        private static boolean isRegex(Symbol symbol) {
-            if (symbol instanceof Terminal) {
-                return true;
+        private RegularExpression getRegex(IValue value) throws Throwable {
+            // String literals are expanded, so here we have to explicitly create a regular expression out of them.
+            if (isLiteral(value)) {
+                IString literalValue = (IString) ((IConstructor) value).get("string");
+                int length = literalValue.length();
+                List<org.iguana.regex.Char> chars = new ArrayList<>(length);
+                for (int i = 0; i < length; i++) {
+                    chars.add(org.iguana.regex.Char.from(literalValue.charAt(i)));
+                }
+                return org.iguana.regex.Seq.from(chars);
             }
-            if (symbol instanceof Identifier) {
-                return true;
-            }
-            if (symbol instanceof Alt) {
-                Alt alt = (Alt) symbol;
-                return alt.getChildren().stream().allMatch(ValueVisitor::isRegex);
-            }
-            if (symbol instanceof Star) {
-                Star star = (Star) symbol;
-                return isRegex(star.getSymbol());
-            }
-            if (symbol instanceof Plus) {
-                Plus plus = (Plus) symbol;
-                return isRegex(plus.getSymbol());
-            }
-            if (symbol instanceof Opt) {
-                Opt opt = (Opt) symbol;
-                return isRegex(opt.getSymbol());
-            }
-            if (symbol instanceof Group) {
-                Group group = (Group) symbol;
-                return group.getChildren().stream().allMatch(ValueVisitor::isRegex);
-            }
-            return false;
+
+            return getRegex((Symbol) value.accept(this));
         }
 
         private static RegularExpression getRegex(Symbol symbol) {
@@ -685,7 +667,7 @@ public class RascalGrammarToIguanaGrammarConverter {
                 List<RegularExpression> regexes = group.getChildren().stream().map(ValueVisitor::getRegex).collect(Collectors.toList());
                 return org.iguana.regex.Seq.from(regexes);
             }
-            throw new RuntimeException("Should not reach here");
+            throw new RuntimeException("Should be a regular expression, but was: " + symbol.getClass());
         }
     }
 }
