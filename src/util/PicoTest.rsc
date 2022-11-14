@@ -5,16 +5,8 @@ import lang::pico::\syntax::Main;
 import ParseTree; 
 import IO;
 
-test bool picoExampleFac() {
-   oldParser = parser(#start[Program]); 
-   newParser = createParser(expand(#start[Program]));
-
-   Tree old = oldParser(readFile(|std:///demo/lang/Pico/programs/Fac.pico|), |std:///demo/lang/Pico/programs/Fac.pico|); 
-   Tree new = newParser(#start[Program], readFile(|std:///demo/lang/Pico/programs/Fac.pico|)); 
-
-   return old == new;
-}
-
+test bool picoExampleFac() = sameTreeTest(#start[Program], |std:///demo/lang/Pico/programs/Fac.pico|);
+   
 @synopsis{for reuse in all regression tests between the old Rascal parser and generated Iguana parsers}
 bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
    oldParser = parser(symbol); 
@@ -23,5 +15,17 @@ bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
    Tree old = oldParser(readFile(file), file); 
    Tree new = newParser(symbol, readFile(file)); 
 
-   return old == new;
+   if (old != new) {
+      if (prods(old) != prods(new)) {
+        println("old has these unique productions:
+                '  <prods(old) - prods(new)>
+                'and new has these unique productions:
+                '  <prods(new) - prods(old)>");
+      }
+      return false;
+   }
+
+   return true;
 }
+
+set[Production] prods(Tree t) = {p | /Production p := t};
