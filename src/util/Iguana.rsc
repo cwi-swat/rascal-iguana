@@ -9,14 +9,19 @@ import lang::rascal::grammar::definition::Parameters;
 import lang::rascal::\syntax::Rascal;
 //import demo::lang::Pico::Syntax;
 
-alias Parser[&T] = &T (&T startSymbol, value input, loc origin);
+alias Parser[&T <: Tree] = &T (type[&T <: Tree] startSymbol, str input);
 
 @javaClass{util.ParserGenerator}
-java Parser[&T] createParser(type[&T] grammar);
+java Parser[&T <: Tree] createParser(type[&T <: Tree] grammar);
 
-&T expand(&T t) {
+type[&T <: Tree] expand(type[&T <: Tree] t) {
     Grammar g = expandParameterizedSymbols(literals(grammar(t)));
-    return type(t.symbol, g.rules);
+    if (type[&T <: Tree] newReifiedGrammar := type(t.symbol, g.rules)) {
+        return newReifiedGrammar;
+    }
+    else {
+        throw "unexpectedly could not create new reified grammar";
+    }
 }
 
 void main() {

@@ -10,7 +10,18 @@ test bool picoExampleFac() {
    newParser = createParser(expand(#start[Program]));
 
    Tree old = oldParser(readFile(|std:///demo/lang/Pico/programs/Fac.pico|), |std:///demo/lang/Pico/programs/Fac.pico|); 
-   Tree new = newParser(readFile(|std:///demo/lang/Pico/programs/Fac.pico|), |std:///demo/lang/Pico/programs/Fac.pico|); 
+   Tree new = newParser(#start[Program], readFile(|std:///demo/lang/Pico/programs/Fac.pico|)); 
+
+   return old == new;
+}
+
+@synopsis{for reuse in all regression tests between the old Rascal parser and generated Iguana parsers}
+bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
+   oldParser = parser(symbol); 
+   newParser = createParser(expand(symbol));
+
+   Tree old = oldParser(readFile(file), file); 
+   Tree new = newParser(symbol, readFile(file)); 
 
    return old == new;
 }
