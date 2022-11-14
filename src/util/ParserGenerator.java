@@ -34,7 +34,8 @@ public class ParserGenerator {
 
         return vf.function(ftype, (args, kwArgs) -> {
             // input is a string for now
-            IConstructor symbol = (IConstructor) args[0];
+            IConstructor type = (IConstructor) args[0]; // the reified type
+            IConstructor symbol = (IConstructor) type.get(0); // the symbol 
             Symbol start;
             try {
                 start = (Symbol) symbol.accept(new RascalGrammarToIguanaGrammarConverter.ValueVisitor());
