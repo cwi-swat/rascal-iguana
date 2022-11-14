@@ -9,8 +9,7 @@ import lang::rascal::grammar::definition::Parameters;
 import lang::rascal::\syntax::Rascal;
 //import demo::lang::Pico::Syntax;
 
-alias Parser[&T] = &T (&T startSymbol, str input, loc origin);
-
+alias Parser[&T] = &T (&T startSymbol, value input, loc origin);
 
 @javaClass{util.ParserGenerator}
 java Parser[&T] createParser(type[&T] grammar);
@@ -53,3 +52,4 @@ void main() {
         println("ambiguity at <l>");
     }
 }
+
