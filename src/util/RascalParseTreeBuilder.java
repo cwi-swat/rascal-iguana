@@ -81,6 +81,11 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
         return vf.appl(definition, children.toArray(ITree[]::new));
     }
 
+    @Override
+    public ITree errorNode(int leftExtent, int rightExtent) {
+        throw new UnsupportedOperationException();
+    }
+
     private IConstructor getRegularDefinition(Symbol symbol) {
         IConstructor definition = (IConstructor) symbol.getAttributes().get("definition");
         Type regular = RascalValueFactory.Production_Regular;
