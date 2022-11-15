@@ -6,6 +6,7 @@ import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.type.Type;
 import io.usethesource.vallang.type.TypeFactory;
 import org.iguana.grammar.Grammar;
+import org.iguana.grammar.symbol.Start;
 import org.iguana.grammar.symbol.Symbol;
 import org.iguana.parser.IguanaParser;
 import org.iguana.result.ParserResultOps;
@@ -39,6 +40,11 @@ public class ParserGenerator {
             Symbol start;
             try {
                 start = (Symbol) symbol.accept(new RascalGrammarToIguanaGrammarConverter.ValueVisitor());
+                // This is a hack for now, we need to change the Iguana symbol hierarchy to allow start accept a
+                // symbol instead of string to make this unified.
+                if (symbol.getName().equals("start")) {
+                    start = Start.from(start.getName());
+                }
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
