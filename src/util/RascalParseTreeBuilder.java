@@ -98,14 +98,6 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
             .setParameter("src", getSourceLocation(leftExtent, rightExtent));
     }
 
-    private ISourceLocation getSourceLocation(int leftExtent, int rightExtent) {
-        int beginLine = input.getLineNumber(leftExtent);
-        int endLine = input.getLineNumber(rightExtent);
-        int beginColumn = input.getColumnNumber(leftExtent);
-        int endColumn = input.getColumnNumber(rightExtent);
-        return vf.sourceLocation(src, leftExtent, rightExtent - leftExtent, beginLine, endLine, beginColumn, endColumn);
-    }
-
     @Override
     public ITree errorNode(int leftExtent, int rightExtent) {
         throw new UnsupportedOperationException();
@@ -116,4 +108,15 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
         Type regular = RascalValueFactory.Production_Regular;
         return vf.constructor(regular, definition);
     }
+
+    private ISourceLocation getSourceLocation(int leftExtent, int rightExtent) {
+        int beginLine = input.getLineNumber(leftExtent);
+        int endLine = input.getLineNumber(rightExtent);
+        // In Rascal columns start from 0, while in Iguana, they start from 1, that's why we decrement the returned
+        // column number from iguana by 1.
+        int beginColumn = input.getColumnNumber(leftExtent) - 1;
+        int endColumn = input.getColumnNumber(rightExtent) - 1;
+        return vf.sourceLocation(src, leftExtent, rightExtent - leftExtent, beginLine, endLine, beginColumn, endColumn);
+    }
+
 }
