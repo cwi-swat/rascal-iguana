@@ -24,7 +24,7 @@ public class ParserGenerator {
     public ParserGenerator(IRascalValueFactory vf, TypeFactory tf) {
         this.vf = vf;
         this.tf = tf;
-        this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(RascalValueFactory.Tree, tf.stringType()), tf.tupleEmpty());
+        this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(RascalValueFactory.Tree, tf.stringType(), tf.sourceLocationType()), tf.tupleEmpty());
     }
 
     public IValue createParser(IValue grammar) {
@@ -37,6 +37,8 @@ public class ParserGenerator {
             // input is a string for now
             IConstructor type = (IConstructor) args[0]; // the reified type
             IConstructor symbol = (IConstructor) type.get(0); // the symbol 
+            ISourceLocation src = (ISourceLocation) args[1];
+            
             Symbol start;
             try {
                 start = (Symbol) symbol.accept(new RascalGrammarToIguanaGrammarConverter.ValueVisitor());

@@ -14,7 +14,7 @@ bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
    newParser = createParser(expand(symbol));
 
    Tree old = oldParser(readFile(file), file); 
-   Tree new = newParser(symbol, readFile(file)); 
+   Tree new = newParser(symbol, readFile(file), file); 
 
    if (old != new) {
       if (prods(old) != prods(new)) {
