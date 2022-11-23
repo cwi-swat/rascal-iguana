@@ -4,6 +4,7 @@ import util::Iguana;
 import lang::pico::\syntax::Main;
 import ParseTree; 
 import IO;
+import Node;
 
 test bool picoExampleFac() = sameTreeTest(#start[Program], |std:///demo/lang/Pico/programs/Fac.pico|);
    
@@ -22,10 +23,33 @@ bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
                 'and new has these unique productions:
                 '  <prods(new) - prods(old)>");
       }
+
+      if (prodList(old) != prodList(new)) {
+        println("order of rules is different
+                '   <prodList(old)>
+                '   <prodList(new)>");
+
+      }
+      if (chars(old) != chars(new)) {
+         println("length old: <size(chars(old))>");
+         println("length new: <size(chars(new))>");
+         println("different chars:
+                 '   <chars(old)>
+                 '   <chars(new)>");
+      }
+
+      if (unsetRec(old) == new) {
+         println("the only difference is source locations:
+                 '  old: <locations(old)>
+                 '  new: <locations(new)>");
+      }
       return false;
    }
 
    return true;
 }
 
+list[loc] locations(Tree t) = [u@\loc?|nothing:///| | /Tree u := t];
+list[int] chars(Tree t) = [i | /char(i) := t];
 set[Production] prods(Tree t) = {p | /Production p := t};
+list[Production] prodList(Tree t) = [p | /Production p := t];
