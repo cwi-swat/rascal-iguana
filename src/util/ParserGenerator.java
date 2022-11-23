@@ -1,6 +1,7 @@
 package util;
 
 import io.usethesource.vallang.IConstructor;
+import io.usethesource.vallang.ISourceLocation;
 import io.usethesource.vallang.IString;
 import io.usethesource.vallang.IValue;
 import io.usethesource.vallang.type.Type;
@@ -30,15 +31,13 @@ public class ParserGenerator {
     public IValue createParser(IValue grammar) {
         RascalGrammarToIguanaGrammarConverter converter = new RascalGrammarToIguanaGrammarConverter();
         Grammar iguanaGrammar = converter.convert((IConstructor) grammar);
-        System.out.println(iguanaGrammar);
         IguanaParser parser = new IguanaParser(iguanaGrammar);
 
         return vf.function(ftype, (args, kwArgs) -> {
             // input is a string for now
             IConstructor type = (IConstructor) args[0]; // the reified type
-            IConstructor symbol = (IConstructor) type.get(0); // the symbol 
-            ISourceLocation src = (ISourceLocation) args[1];
-            
+            IConstructor symbol = (IConstructor) type.get(0); // the symbol
+
             Symbol start;
             try {
                 start = (Symbol) symbol.accept(new RascalGrammarToIguanaGrammarConverter.ValueVisitor());
@@ -54,7 +53,9 @@ public class ParserGenerator {
             Input input = Input.fromString(inputString.getValue());
             parser.parse(input, start);
 
-            RascalParseTreeBuilder parseTreeBuilder = new RascalParseTreeBuilder(vf, input);
+            ISourceLocation src = (ISourceLocation) args[2];
+
+            RascalParseTreeBuilder parseTreeBuilder = new RascalParseTreeBuilder(vf, input, src);
             DefaultSPPFToParseTreeVisitor<ITree> visitor = new DefaultSPPFToParseTreeVisitor<>(parseTreeBuilder, input, false, new ParserResultOps());
             return parser.getSPPF().accept(visitor);
         });
