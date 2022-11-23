@@ -9,7 +9,7 @@ import lang::rascal::grammar::definition::Parameters;
 import lang::rascal::\syntax::Rascal;
 //import demo::lang::Pico::Syntax;
 
-alias Parser[&T <: Tree] = &T (type[&T <: Tree] startSymbol, str input);
+alias Parser[&T <: Tree] = &T (type[&T <: Tree] startSymbol, str input, loc src);
 
 @javaClass{util.ParserGenerator}
 java Parser[&T <: Tree] createParser(type[&T <: Tree] grammar);
@@ -48,7 +48,7 @@ void main() {
             'syntax State = @Foldable state: \"state\" Id name Trans* out;
             'syntax Trans = trans: Id event \":\" Id to;
             ";
-        iprintln(parser(#start[Module].symbol, rascalInput));
+        iprintln(parser(#start[Module].symbol, rascalInput, |example:///|));
     }
     catch ParseError(loc l): {
         printn("parse error <l>");
