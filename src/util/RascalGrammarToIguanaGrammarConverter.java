@@ -139,6 +139,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             return Tuple.of(o.getName(), value);
         }
 
+        @SuppressWarnings("unchecked")
         private void addChildren(Collection<Object> children, List<PriorityLevel> levels) {
             List<Object> alternativesOrSequences = children.stream().filter(c -> c instanceof Alternative || c instanceof Sequence).collect(Collectors.toList());
             List<Object> priorityLevels = children.stream().filter(c -> c instanceof PriorityLevel).collect(Collectors.toList());
@@ -250,7 +251,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             Symbol head = (Symbol) headDef.accept(this);
             Rule.Builder ruleBuilder = new Rule.Builder(Nonterminal.withName(head.getName()));
 
-            Set<Object> alternatives = (Set<Object>) cons.get("alternatives").accept(this);
+            Set<Object> alternatives = visit(cons, "alternatives");
 
             List<PriorityLevel> priorityLevels = new ArrayList<>();
             addChildren(alternatives, priorityLevels);
@@ -290,7 +291,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // parameterized-sort(str name, list[Symbol] parameters)
         private Nonterminal convertParametrizedSort(IConstructor cons) throws Throwable {
             String name = (String) cons.get("name").accept(this);
-            List<Symbol> parameters = (List<Symbol>) cons.get("parameters").accept(this);
+            List<Symbol> parameters = visit(cons, "parameters");
             return Nonterminal.withName(name + "_" + listToString(parameters, "_"));
         }
 
@@ -303,15 +304,13 @@ public class RascalGrammarToIguanaGrammarConverter {
         private Sequence convertProd(IConstructor cons) throws Throwable {
             Sequence.Builder sequenceBuilder = new Sequence.Builder();
 
-            String label = null;
             // The label for the alternative
             Symbol def = (Symbol) cons.get("def").accept(this);
             if (def.getLabel() != null) {
-                label = def.getLabel();
                 sequenceBuilder.setLabel(def.getLabel());
             }
 
-            List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
+            List<Symbol> symbols = visit(cons, "symbols");
             for (Symbol symbol : symbols) {
                 if (!isLayoutSymbol(symbol.getName())) {
                     sequenceBuilder.addSymbol(symbol);
@@ -320,7 +319,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
             // attributes
             // TODO: check if this is necessary, or just having the Rascal definition is enough to retrieve these info.
-            Set<Tuple<String, Object>> attributes = (Set<Tuple<String, Object>>) cons.get("attributes").accept(this);
+            Set<Tuple<String, Object>> attributes = visit(cons, "attributes");
             for (Tuple<String, Object> attribute : attributes) {
                 sequenceBuilder.addAttribute(attribute.getFirst(), attribute.getSecond());
             }
@@ -348,7 +347,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         private List<PriorityLevel> convertPriority(IConstructor cons) throws Throwable {
             List<PriorityLevel> priorityLevels = new ArrayList<>();
 
-            List<Object> choices = (List<Object>) cons.get("choices").accept(this);
+            List<Object> choices = visit(cons, "choices");
 
             for (Object child : choices) {
                 if (child instanceof Sequence) {
@@ -388,7 +387,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // alt(set[Symbol] alternatives)
         private Alt convertAlt(IConstructor cons) throws Throwable {
-            Set<Symbol> symbols = (Set<Symbol>) cons.get("alternatives").accept(this);
+            Set<Symbol> symbols = visit(cons, "alternatives");
             return new Alt.Builder(new ArrayList<>(symbols)).addAttribute("definition", cons).build();
         }
 
@@ -400,7 +399,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // seq(list[Symbol] symbols)
         private Group convertSeq(IConstructor cons) throws Throwable {
-            List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
+            List<Symbol> symbols = visit(cons, "symbols");
             return new Group.Builder(symbols).addAttribute("definition", cons).build();
         }
 
@@ -413,7 +412,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // iter-seps(Symbol symbol, list[Symbol] separators)
         private Plus convertIterSeps(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
+            List<Symbol> separators = visit(cons, "separators");
             Plus.Builder plusBuilder = new Plus.Builder(symbol);
             for (Symbol separator : separators) {
                 if (!isLayoutSymbol(separator.getName())) {
@@ -433,7 +432,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // iter-star-seps(Symbol symbol, list[Symbol] separators)
         private Star convertIterStarSeps(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
+            List<Symbol> separators = visit(cons, "separators");
             Star.Builder starBuilder = new Star.Builder(symbol);
             for (Symbol separator : separators) {
                 if (!isLayoutSymbol(separator.getName())) {
@@ -447,7 +446,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // associativity(Symbol def, Associativity assoc, set[Production] alternatives)
         private Alternative convertAssociativity(IConstructor cons) throws Throwable {
             Associativity associativity = (Associativity) cons.get("assoc").accept(this);
-            Set<Sequence> seqs = (Set<Sequence>) cons.get("alternatives").accept(this);
+            Set<Sequence> seqs = visit(cons, "alternatives");
             Alternative.Builder alternativeBuilder = new Alternative.Builder();
             alternativeBuilder.addSequences(new ArrayList<>(seqs));
             // Iguana only supports associativity for groups of size at least 2.
@@ -494,7 +493,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
         // char-class(list[CharRange] ranges)
         private Terminal convertCharClass(IConstructor cons) throws Throwable {
-            List<CharRange> ranges = (List<CharRange>) cons.get("ranges").accept(this);
+            List<CharRange> ranges = visit(cons, "ranges");
             return Terminal.from(org.iguana.regex.Alt.from(ranges));
         }
 
@@ -508,7 +507,7 @@ public class RascalGrammarToIguanaGrammarConverter {
         // conditional(Symbol symbol, set[Condition] conditions)
         private Symbol convertConditional(IConstructor cons) throws Throwable {
             Symbol symbol = (Symbol) cons.get("symbol").accept(this);
-            Set<Object> conditions = (Set<Object>) cons.get("conditions").accept(this);
+            Set<Object> conditions = visit(cons, "conditions");
             SymbolBuilder<? extends Symbol> builder = symbol.copy();
             for (Object obj : conditions) {
                 if (obj instanceof Condition) {
@@ -598,6 +597,11 @@ public class RascalGrammarToIguanaGrammarConverter {
         // adt(str name, list[Symbol] parameters)
         private Tuple<String, List<Symbol>> convertADT(IConstructor cons) {
             throw new RuntimeException("Parametrized sorts are expanded before conversion.");
+        }
+
+        @SuppressWarnings("unchecked")
+        private <T> T visit(IConstructor cons, String name) throws Throwable {
+            return (T) cons.get(name).accept(this);
         }
 
         private boolean isLayoutSymbol(String name) {
