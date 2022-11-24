@@ -25,11 +25,12 @@ bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
       }
 
       if (prodList(old) != prodList(new)) {
-        println("order of rules is different
+        println("order of rule application is different
                 '   <prodList(old)>
                 '   <prodList(new)>");
 
       }
+      
       if (chars(old) != chars(new)) {
          println("length old: <size(chars(old))>");
          println("length new: <size(chars(new))>");
