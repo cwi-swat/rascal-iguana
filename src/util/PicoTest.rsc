@@ -43,6 +43,11 @@ bool sameTreeTest(type[&T <: Tree] symbol, loc file) {
                  '  old: <locations(old)>
                  '  new: <locations(new)>");
       }
+
+      if (locations(old) != locations(new)) {
+         println("Unique old <locations(old) - locations(new)>");
+         println("Unique new <locations(new) - locations(old)>");
+      }
       return false;
    }
 
