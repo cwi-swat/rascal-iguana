@@ -18,6 +18,8 @@ import org.rascalmpl.values.parsetrees.ITree;
 import java.util.List;
 import java.util.Set;
 
+import static util.IValueUtils.isLiteral;
+
 public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
 
     private final IRascalValueFactory vf;
@@ -45,9 +47,14 @@ public class RascalParseTreeBuilder implements ParseTreeBuilder<ITree> {
     @Override
     public ITree nonterminalNode(RuntimeRule rule, List<ITree> children, int leftExtent, int rightExtent) {
         IConstructor prod = (IConstructor) rule.getAttributes().get("prod");
-        return (ITree) vf.appl(prod, vf.list(children.toArray(ITree[]::new)))
-            .asWithKeywordParameters()
-            .setParameter("src", getSourceLocation(leftExtent, rightExtent));
+        // Literals don't get the source annotation in Rascal.
+        if (isLiteral(prod.get("def"))) {
+            return vf.appl(prod, vf.list(children.toArray(ITree[]::new)));
+        } else {
+            return (ITree) vf.appl(prod, vf.list(children.toArray(ITree[]::new)))
+                .asWithKeywordParameters()
+                .setParameter("src", getSourceLocation(leftExtent, rightExtent));
+        }
     }
 
     @Override

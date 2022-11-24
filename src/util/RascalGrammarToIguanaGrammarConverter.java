@@ -16,6 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.iguana.utils.string.StringUtil.listToString;
+import static util.IValueUtils.*;
 
 public class RascalGrammarToIguanaGrammarConverter {
 
@@ -172,9 +173,10 @@ public class RascalGrammarToIguanaGrammarConverter {
             switch (cons.getName()) {
                 case "choice": return convertChoice(cons);
                 case "prod": return convertProd(cons);
-                case "sort": return convertSort(cons);
-                case "lex": return convertSort(cons);
-                case "layouts": return convertSort(cons);
+                case "sort":
+                case "lex":
+                case "layouts":
+                    return convertSort(cons);
                 case "keywords": return convertKeywords(cons);
                 case "parameterized-sort": return convertParametrizedSort(cons);
                 case "parameterized-lex": return convertParametrizedLex(cons);
@@ -239,27 +241,6 @@ public class RascalGrammarToIguanaGrammarConverter {
         @Override
         public Object visitDateTime(IDateTime o) {
             throw new RuntimeException(o.toString());
-        }
-
-        private static boolean isLexical(IValue value) {
-            if (!(value instanceof IConstructor)) return false;
-            String name = ((IConstructor) value).getName();
-            return name.equals("lex") || name.equals("parameterized-lex");
-        }
-
-        private static boolean isLiteral(IValue value) {
-            if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("lit");
-        }
-
-        private static boolean isLayout(IValue value) {
-            if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("layouts");
-        }
-
-        private static boolean isStart(IValue value) {
-            if (!(value instanceof IConstructor)) return false;
-            return ((IConstructor) value).getName().equals("start");
         }
 
         // choice(Symbol def, set[Production] alternatives)
@@ -332,7 +313,7 @@ public class RascalGrammarToIguanaGrammarConverter {
 
             List<Symbol> symbols = (List<Symbol>) cons.get("symbols").accept(this);
             for (Symbol symbol : symbols) {
-                if (!isLayout(symbol.getName())) {
+                if (!isLayoutSymbol(symbol.getName())) {
                     sequenceBuilder.addSymbol(symbol);
                 }
             }
@@ -435,7 +416,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
             Plus.Builder plusBuilder = new Plus.Builder(symbol);
             for (Symbol separator : separators) {
-                if (!isLayout(separator.getName())) {
+                if (!isLayoutSymbol(separator.getName())) {
                     plusBuilder.addSeparator(separator);
                 }
             }
@@ -455,7 +436,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             List<Symbol> separators = (List<Symbol>) cons.get("separators").accept(this);
             Star.Builder starBuilder = new Star.Builder(symbol);
             for (Symbol separator : separators) {
-                if (!isLayout(separator.getName())) {
+                if (!isLayoutSymbol(separator.getName())) {
                     starBuilder.addSeparator(separator);
                 }
             }
@@ -619,7 +600,7 @@ public class RascalGrammarToIguanaGrammarConverter {
             throw new RuntimeException("Parametrized sorts are expanded before conversion.");
         }
 
-        private boolean isLayout(String name) {
+        private boolean isLayoutSymbol(String name) {
             return layout != null && layout.getName().equals(name);
         }
 
