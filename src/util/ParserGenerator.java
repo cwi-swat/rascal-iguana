@@ -16,6 +16,7 @@ import org.iguana.utils.input.Input;
 import org.rascalmpl.values.IRascalValueFactory;
 import org.rascalmpl.values.RascalValueFactory;
 import org.rascalmpl.values.parsetrees.ITree;
+import java.util.Map;
 
 public class ParserGenerator {
     private final IRascalValueFactory vf;
@@ -25,7 +26,8 @@ public class ParserGenerator {
     public ParserGenerator(IRascalValueFactory vf, TypeFactory tf) {
         this.vf = vf;
         this.tf = tf;
-        this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(RascalValueFactory.Tree, tf.stringType(), tf.sourceLocationType()), tf.tupleEmpty());
+        Type typeOfTree = RascalValueFactory.Type.instantiate(Map.of(RascalValueFactory.TypeParam, RascalValueFactory.Tree));
+        this.ftype = tf.functionType(RascalValueFactory.Tree, tf.tupleType(typeOfTree, tf.stringType(), tf.sourceLocationType()), tf.tupleEmpty());
     }
 
     public IValue createParser(IValue grammar) {
