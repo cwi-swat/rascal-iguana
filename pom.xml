@@ -14,7 +14,7 @@
 
         <build>
             <sourceDirectory>src</sourceDirectory>
-            <testSourceDirectory>src</testSourceDirectory>
+            <testSourceDirectory>test</testSourceDirectory>
 
             <plugins>
                 <plugin>
@@ -30,6 +30,31 @@
                     <groupId>org.rascalmpl</groupId>
                     <artifactId>rascal-maven-plugin</artifactId>
                     <version>0.8.1</version>
+                </plugin>
+                <plugin>    
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>2.22.2</version>
+                    <executions>
+                        <execution>
+                            <id>test</id>
+                            <phase>test</phase>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <argLine>
+                                -ea
+                                -Xmx2G
+                                -Xss128m
+                                -Dfile.encoding=UTF-8
+                        </argLine>
+                        <includes>
+                            <include>RunAllTests.java</include>
+                        </includes>
+                    </configuration>
                 </plugin>
 
             </plugins>
@@ -50,6 +75,12 @@
         </pluginRepositories>
 
 	<dependencies>
+         <!-- <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.13.1</version>
+                <scope>test</scope>
+            </dependency> -->
         <dependency>
             <groupId>org.rascalmpl</groupId>
             <artifactId>rascal</artifactId>
