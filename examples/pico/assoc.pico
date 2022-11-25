@@ -1,0 +1,9 @@
+begin declare a : natural,  
+              b : natural,           
+              c : natural,
+              d : natural;
+      a := 14 + 14 + 14;
+      b := 14 - 14 - 14;
+      c := 14 + 13 - 14;
+      d := 14 - 13 + 12
+end
